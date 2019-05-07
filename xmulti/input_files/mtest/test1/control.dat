@@ -1,8 +1,0 @@
-INPUT_FILE input.test1
-MODEL_FILE model.test1
-GEOMETRY_FILE molecular_geometry.test1
-MULTIPOLE_FILE multipole.test1
-INPUT UNITS KJ
-OUTPUT UNITS KJ
-ENERGY
-STOP
