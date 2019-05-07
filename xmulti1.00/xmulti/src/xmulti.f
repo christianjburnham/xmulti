@@ -6663,9 +6663,3 @@
       end subroutine get_lab_spherical3
 
 
-      subroutine file_doesnt_exist(filename)
-      implicit none
-      character(len = *) :: filename
-      write(*,*) 'ERROR: FILE ',filename,' DOES NOT EXIST'
-      stop
-      end 
