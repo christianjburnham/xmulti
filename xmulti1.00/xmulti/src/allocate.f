@@ -8,7 +8,7 @@
       character(len=2048) :: buffer
       character(len = 2048), dimension(64) :: textlist
       integer ios,nitems,line
-
+      logical file_exists
 
 !    defaults
 
@@ -24,7 +24,9 @@
 
 !     read in the size.dat file
 
-      open(10,file = 'size.dat')
+      inquire(file = 'size.dat',exist = file_exists)
+      if(.not.file_exists) call file_doesnt_exist('size.dat')
+
       line = 0
 
       do while(.true.)
