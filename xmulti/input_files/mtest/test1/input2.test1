@@ -1,6 +1,0 @@
-           2
-
- RIGID XYZ     
-molecule  quad_mol   coord  0.0 0.0 0.0 0.0 0.0 0.0
-molecule  dipole_mol coord  3.0 2.0 4.0 1.0 2.0 3.0
-
