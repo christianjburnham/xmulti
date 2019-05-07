@@ -1,0 +1,10 @@
+MOLECULE charge_mol
+O   type  1  mass 1.0 
+MOLECULE dipole_mol
+O   type  1  mass 1.0 
+MOLECULE quad_mol
+O   type  1  mass 1.0 
+MOLECULE oct_mol
+O   type  1  mass 1.0 
+INTER
+

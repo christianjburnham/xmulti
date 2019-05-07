@@ -1,0 +1,54 @@
+---------------------------------------------------
+SUPERCELL.F
+---------------------------------------------------
+
+DESCRIPTION
+
+This is an auxillary code which is useful to view the best crystal structure minima found by XMULTI.F. It simply replicates the unit cell coordinate in all 3 directions, so that the 
+periodic structure of the crystal is made more apparent.
+
+COMPILATION
+
+gfortran -O3 -ffree-form -ffast-math supercell.f -o supercell
+
+Run code with: ./supercell
+
+SUPERCELL INPUT FILES:
+
+Requires MONTE_MIN.XYZ, which is output from basin-hopping run of XMULTI.F, and which contains the coordinates of the best minima found so far.
+
+SUPERCELL OUTPUT FILES:
+
+SUPER.XYZ: A VMD viewable file, which contains the replicated XYZ coordinates of the crystal structure minima found by XMULTI.F.
+
+---------------------------------------------------
+MAKESTRUCT.F
+---------------------------------------------------
+Generates random initial input file
+
+COMPILATION
+
+gfortran -O3 -ffree-form -ffast-math makestruct.f -o makestruct
+
+MAKESTRUCT INPUT FILES: 
+
+MAKESTRUCT.CONTROL
+      control file for makestruct.f
+
+MAKESTRUCT.CONTROL KEYWORDS:
+
+PERIODIC(keyword)
+    sets periodicity of cell to be on. (Default: periodic is off.)
+    To run a system without periodicity, just delete this line.
+CVEC (keyword), [{CX,CY,CZ}(real)] 
+  sets the length of the orthorhombic cell-vectors
+RMIN(keyword), [rmin]
+  sets the minimum center of mass distance between two molecules in the structure, with rmin in Angstroms.
+MOLNAME [nmol]
+  will generate the structure for nmol molecules with name MOLNAME. MOLNAME should correspond to a molecule 
+  in GEOMETRY_FILE and MODEL_FILE.
+
+MAKESTRUCT OUTPUT FILES: 
+
+MAKESTRUCT 
+prints structure to screen. To generate an input file, try ./makestruct > input.dat
