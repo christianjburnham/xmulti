@@ -5,5 +5,5 @@ nmol_max  100
 nspline_max  256
 nbondlist_max  500
 nmodel_param_max  200
-nterms_max = 200
-nbin_max = 500
+nterms_max 200
+nbin_max 500
