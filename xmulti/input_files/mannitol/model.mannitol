@@ -1,0 +1,70 @@
+MOLECULE mannitol 
+O   type  1  mass 16.0   
+H   type  2  mass 1.0    
+O   type  1  mass 16.0   
+H   type  2  mass 1.0    
+O   type  1  mass 16.0   
+H   type  2  mass 1.0    
+O   type  1  mass 16.0   
+H   type  2  mass 1.0    
+O   type  1  mass 16.0   
+H   type  2  mass 1.0    
+O   type  1  mass 16.0   
+H   type  2  mass 1.0    
+C   type  3  mass 12.0   
+H   type  4  mass 1.0    
+H   type  4  mass 1.0    
+C   type  3  mass 12.0   
+H   type  4  mass 1.0    
+C   type  3  mass 12.0   
+H   type  4  mass 1.0    
+C   type  3  mass 12.0   
+H   type  4  mass 1.0    
+C   type  3  mass 12.0   
+H   type  4  mass 1.0    
+C   type  3  mass 12.0   
+H   type  4  mass 1.0    
+H   type  4  mass 1.0    
+DAMP 0.7d0
+NSPLINE 100
+INTER 4 8 12
+PAIR                 1               1
+POWER                4               8              12
+COEFF      -1062.86039     90815.82674   -412668.55520
+SPLINE         RMIN  2.34375   RMAX   12.00000   R0   1.00000  U0   400.00000  DUDR0    -600.00000
+PAIR                 1               2
+POWER                4               8              12
+COEFF       -174.26712       576.61721      -757.61280
+SPLINE         RMIN  1.40625   RMAX   12.00000   R0   1.00000  U0   400.00000  DUDR0    -1800.00000
+PAIR                 1               3
+POWER                4               8              12
+COEFF        889.83821    -39107.76717   2262910.70700
+SPLINE         RMIN  2.81250   RMAX   12.00000   R0   1.00000  U0   400.00000  DUDR0    -600.00000
+PAIR                 1               4
+POWER                4               8              12
+COEFF       -338.62225      7493.89000    -28638.18757
+SPLINE         RMIN  1.87500   RMAX   12.00000   R0   1.00000  U0   400.00000  DUDR0    -600.00000
+PAIR                 2               2
+POWER                4               8              12
+COEFF         62.75716       384.19418     -1168.53679
+SPLINE         RMIN  1.71875   RMAX   12.00000   R0    1.00000 U0   400.00000  DUDR0    -1200.00000
+PAIR                 2               3
+POWER                4               8              12
+COEFF       -254.45089      4735.85840    -15181.64805
+SPLINE         RMIN  2.18750   RMAX   12.00000   R0    1.00000 U0    400.00000  DUDR0    -600.00000
+PAIR                 2               4
+POWER                4               8              12
+COEFF         34.25520       468.55746     -1528.76909
+SPLINE         RMIN  1.71875   RMAX   12.00000   R0    1.00000 U0     400.00000 DUDR0    -1200.00000
+PAIR                 3               3
+POWER                4               8              12
+COEFF       -103.49645   -219313.22624  17610212.70951
+SPLINE         RMIN  3.28125   RMAX   12.00000   R0    1.00000 U0     400.00000 DUDR0     -600.00000
+PAIR                 3               4
+POWER                4               8              12
+COEFF        312.90511     -6315.83588    158037.47697
+SPLINE         RMIN  2.34375   RMAX   12.00000   R0    1.00000 U0     400.00000 DUDR0     -600.00000
+PAIR                 4               4
+POWER                4               8              12
+COEFF        -87.20837      1353.39241     -3542.56990
+SPLINE         RMIN 1.71875    RMAX    12.00000  R0    1.00000 U0     400.00000 DUDR0     -1200.00000

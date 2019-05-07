@@ -1,0 +1,9 @@
+INPUT_FILE input.mtest
+MODEL_FILE model.mtest
+GEOMETRY_FILE molecular_geometry.mtest
+MULTIPOLE_FILE multipole.mtest
+INPUT UNITS KJ
+OUTPUT UNITS KJ
+ENERGY
+PRINT MULTIPOLES
+STOP

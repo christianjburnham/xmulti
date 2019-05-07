@@ -1,0 +1,9 @@
+           4
+
+ RIGID XYZ     
+molecule  charge_mol coord  0.0 0.0 0.0 0.0 0.0 0.0
+molecule  dipole_mol coord  5.0 0.0 0.0 0.0 0.0 0.0
+molecule  quad_mol coord  10.0 0.0 0.0 0.0 0.0 0.0
+molecule  oct_mol coord  15.0 0.0 0.0 0.0 0.0 0.0
+
+

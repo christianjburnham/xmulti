@@ -1,0 +1,11 @@
+molecule charge_mol
+O  1.3d0 
+molecule dipole_mol
+O   1d+4
+O   -1d+4
+molecule quad_mol
+O   0.0d0 0.3d+4 0.7d+4 -0.6d+4
+O   0.0d0 -0.3d+4 -0.7d+4 +0.6d+4
+molecule oct_mol
+O   0.0 0.0 0.0 0.0 0.2d+4 -0.3d+4 -0.4d+4 0.1d+4
+O   0.0 0.0 0.0 0.0 -0.2d+4 0.3d+4 0.4d+4 -0.1d+4
