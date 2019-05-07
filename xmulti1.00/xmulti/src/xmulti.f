@@ -3679,7 +3679,8 @@
       model_index_max = 0 
 
 !     defaults
-      nspline = 100
+      ns = 100
+      call set_nspline(ns)
 
       do while(.true.)
          read(30,'(A)',iostat = ios) buffer
@@ -5133,6 +5134,12 @@
       integer ns
 
       nspline = ns
+
+      if(nspline.gt.nspline_max) then 
+         write(*,*) 'ERROR: nspline ',nspline,&
+     & ' > nspline_max in size.dat = ',nspline_max
+         stop
+      endif
       end subroutine set_nspline
 
       subroutine set_pressure(press)
