@@ -70,3 +70,10 @@
       end function upcase
 
       end module parse_text
+
+      subroutine file_doesnt_exist(filename)
+      implicit none
+      character(len = *) :: filename
+      write(*,*) 'ERROR: FILE ',filename,' DOES NOT EXIST'
+      stop
+      end 
