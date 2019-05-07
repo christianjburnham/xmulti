@@ -1,8 +1,0 @@
-molecule charge_mol  natoms  1
- O    0.0 0.0 0.0 
-molecule dipole_mol  natoms  1
- O    0.0 0.0 0.0 
-molecule quad_mol  natoms  1
- O    0.0 0.0 0.0 
-molecule oct_mol  natoms  1
- O    0.0 0.0 0.0 
