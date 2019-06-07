@@ -2814,7 +2814,7 @@
          write(ifile,17) molecule_name_list(moltype),mol_conformer(imol),g1,g2,g3 &
      & ,mol_euler(1,imol),mol_euler(2,imol),mol_euler(3,imol)
 
- 17      format('MOLECULE',a16,' CONFORMER',i4,' COORD',6f10.6)
+ 17      format('MOLECULE  ',a16,' CONFORMER',i4,' COORD',6f12.6)
 
       end do 
       call flush(ifile)
@@ -5780,7 +5780,7 @@
       write(*,*) '***   MOLECULAR MULTIPOLE MOMENTS IN GAUSSIAN AND GDMA FORMAT'
       write(*,*) '*****************************************************'
 
-!     conversion factors for multipoles from eA^n to internal units
+!     conversion factors for multipoles from e Bohr^n to internal units
       conv(0) = 1.0d0 
       do k = 1,10
          conv(k) = conv(k-1) * fac(5)
