@@ -29,7 +29,7 @@
       character(len=6) :: version
       character(len=32) :: arg
 
-      version = '1.00'
+      version = '1.01'
       
       do i = 1,command_argument_count()
          call get_command_argument(i, arg)
@@ -2846,7 +2846,7 @@
      &           ,utotal * pefac,pressure_internal*fac(7),density*fac(8)
          endif
          else
-            write(ifile,*)
+            write(ifile,*) utotal * pefac
          endif
       do imol = 1,nmol
 
@@ -3608,42 +3608,43 @@
       use parse_text
       implicit none
       character(len = 2048) :: buffer
-      real(8), dimension(6) :: vec
       real(8) :: amag,bmag,cmag,alpha,beta,gamma
+      character(len = 2048), dimension(64) :: textlist
       character(len = 8) :: type
       logical okflag
+      integer nitems
 
-      if(buffer.ne.'    ') then 
-         periodic = .true.
-         read(buffer,*) type,vec
+      periodic = .false.
+      call split_text_to_list(buffer,textlist,nitems)
+!     for blank line, which is an acceptable way to specify no pbc
+      if(nitems.ne.1) then 
+         read(textlist(1),*) type
          type = upcase(type)
-
-         if(type.eq.'XYZ') then
-            cvec(1,1) = vec(1)
-            cvec(1,2) = vec(2)
-            cvec(2,2) = vec(3)
-            cvec(1,3) = vec(4)
-            cvec(2,3) = vec(5)
-            cvec(3,3) = vec(6)
-         else if(type.eq.'ANGLE') then 
-            amag = vec(1)
-            bmag = vec(2)
-            cmag = vec(3)
-            alpha = vec(4)
-            beta = vec(5)
-            gamma = vec(6)
-            call get_cartesian_cvec(amag,bmag,cmag,alpha,beta,gamma,cvec)
-         else
-            write(*,*) 'ERROR: MUST SPECIFY EITHER XYZ&
-     & OR ANGLE CVEC TYPE IN INPUT_FILE'
-            stop
-         endif
-
-         call mat3inverse(cvec,cveci,okflag)
-      else 
+         select case(type)
+      case('XYZ') 
+         periodic = .true.
+         read(textlist(2),*) cvec(1,1)
+         read(textlist(3),*) cvec(1,2)
+         read(textlist(4),*) cvec(2,2)
+         read(textlist(5),*) cvec(1,3)
+         read(textlist(6),*) cvec(2,3)
+         read(textlist(7),*) cvec(3,3)
+      case('ANGLE')
+         periodic = .true.
+         read(textlist(2),*) amag            
+         read(textlist(3),*) bmag
+         read(textlist(4),*) cmag
+         read(textlist(5),*) alpha
+         read(textlist(6),*) beta
+         read(textlist(7),*) gamma
+         call get_cartesian_cvec(amag,bmag,cmag,alpha,beta,gamma,cvec)
+      case('NOPBC')
          periodic = .false.
+      end select
       endif
-
+      
+      if(periodic)  call mat3inverse(cvec,cveci,okflag)
+      
       end subroutine get_cvec
 
 
@@ -4966,14 +4967,15 @@
                               rdis = dsqrt(rdis2)
                               ibin = anint((rdis / rcut) * ibinmax)
                               rdf(ibin) = rdf(ibin) + 1.0d0 
-                           endif
                            
-                           if(rdis2.le.dismin2) then
-                              dismin2 = rdis2
+                              if(rdis2.le.dismin2) then
+                                 dismin2 = rdis2
+                              endif
+                              if(rdis2.lt.rmin2) then
+                                 too_close = .true.
+                              endif
                            endif
-                           if(rdis2.lt.rmin2) then
-                              too_close = .true.
-                           endif
+
                            
                         endif
                         
@@ -5428,6 +5430,8 @@
 
       do while(.true.)
          call read_input_file(ios)
+         if(ios.ne.0) stop
+
          if(periodic) then
             call generate_cartesians_from_frac()
          else
@@ -5436,10 +5440,15 @@
          mintol = 0.0d0 
          call minimize()
          call get_cell_mass
-         call calc_press_and_dens
-         write(*,*) utotal * pefac,pressure_internal*fac(7),density*fac(8)
-         write(140,*) utotal * pefac,pressure_internal*fac(7),density*fac(8)
-         call flush(140)
+         if(periodic) then
+            call calc_press_and_dens
+            write(*,*) utotal * pefac,pressure_internal*fac(7),density*fac(8)
+            write(140,*) utotal * pefac,pressure_internal*fac(7),density*fac(8)
+            call flush(140)
+         else
+            write(*,*) utotal * pefac
+            write(140,*) utotal * pefac
+         endif
          call print_coordinates(141)
          call print_rigid_coordinates(142)
          call check_for_collisions(r_closest,too_close,dismin,printrdf)
@@ -5777,10 +5786,11 @@
       real(8), dimension(0:10) :: conv,stone_conv
 
       write(*,*) '*****************************************************'
-      write(*,*) '***   MOLECULAR MULTIPOLE MOMENTS IN GAUSSIAN AND GDMA FORMAT'
+      write(*,*) '***   MOLECULAR MULTIPOLE MOMENTS IN &
+     &GAUSSIAN AND GDMA FORMAT'
       write(*,*) '*****************************************************'
 
-!     conversion factors for multipoles from e Bohr^n to internal units
+!     conversion factors for multipoles from e bohr^n to internal units
       conv(0) = 1.0d0 
       do k = 1,10
          conv(k) = conv(k-1) * fac(5)
