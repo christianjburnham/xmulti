@@ -20,7 +20,7 @@
       write(*,*) '** @christianjburnham@gmail.com'
       write(*,*) '*********************************************'
 
-!      call init_random_seed()
+      call init_random_seed()
 
       rmin = -1.0d0 
       rmax = 1.0d0 
