@@ -1,0 +1,41 @@
+SPHERICAL HARMONIC TESTS
+
+Christian J. Burnham, University College Dublin 2019
+
+Three small codes which do the following
+
+i) Populate the components of two rank n Cartesian tensors, a and b, with random numbers.
+
+ii) Detrace each tensor. This is done essentially by converting the cartesians to 
+spherical harmonics, and then converting then back into cartesians.
+
+iii) Detrace each tensor again, which should leave the tensor 
+unchanged, hence showing that the detracing operator is a projection operator.
+
+iv) Check that the traces of the detraced tensor are zero, where the 
+traces are a rank n - 2 tensor.
+
+v) Calculate the inner product: <a,b> (where a and be are zero trace), 
+in both Cartesians and spherical harmonics, to show that they give the 
+same results.
+
+The codes are intentionally short and easy to follow. Studying them 
+will give a good understanding of how to convert between 
+cartesians and spherical harmonics.
+
+The subroutines convert_xx_to_cartesian and 
+convert_xx_to_spherical, where xx = quad/oct/hex 
+are based on the tables in 
+
+The Theory of Intermolecular Forces
+Anthony Stone
+Oxford University Press, 2nd edition (2016)
+
+And the method is described in 
+
+A new relatively simple approach to the multipole interactions in either 
+spherical harmonics or Cartesians, suitable for implementation into Ewald sums
+
+C. J. Burnham and N. J. English, 
+Journal of Chemical Physics (2019)
+
