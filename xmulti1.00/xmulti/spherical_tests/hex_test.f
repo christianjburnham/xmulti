@@ -20,7 +20,7 @@
       write(*,*) '** @christianjburnham@gmail.com'
       write(*,*) '*********************************************'
 
-      call init_random_seed()
+!      call init_random_seed()
 
       rmin = -1.0d0 
       rmax = 1.0d0 
@@ -197,15 +197,18 @@
       real(8) xxxx,xxxy,xxxz,xxyy,xxyz,xxzz,xyyy,&
      & xyyz,xyzz,xzzz,yyyy,yyyz,yyzz,yzzz,zzzz
       real(8), dimension(9) :: solid4
+      real(8) :: s
       real(8) :: fac1 = 3.0d0 * dsqrt(70.0d0)/140.0d0, fac2 = dsqrt(14.0d0)/14.0d0,&
     & fac3 = dsqrt(2.0d0)/4.0d0, fac4 = dsqrt(14.0d0)/28.0d0, fac5 = dsqrt(70.0d0)/140.0d0,&
     & fac6 = 3.0d0 * dsqrt(7.0d0)/28.0d0, fac7 = dsqrt(7.0d0)/28.0d0, fac8 = dsqrt(70.0d0)/35.0d0,&
     & fac9 = dsqrt(7.0d0)/7.0d0, fac10 = dsqrt(8.0d0 / 35.0d0)
 
+      s = dsqrt(8.0d0 / 35.0d0)
+
       xxxx = fac1 * solid4(1) - fac2 * solid4(4) + fac3 * solid4(8)
       xxxy = -fac4 * solid4(5) + fac3 * solid4(9)
       xxyy =  fac5 * solid4(1) - fac3 * solid4(8)
-      xyyy = -fac4 * solid4(5) + fac3 * solid4(9)
+      xyyy = -fac4 * solid4(5) - fac3 * solid4(9)
       yyyy = fac1 * solid4(1) + fac2 * solid4(4) + fac3 * solid4(8)
       xxxz =  - fac6 * solid4(2) + 0.25d0 * solid4(6)
       xxyz =  - fac7 * solid4(3) + 0.25d0 * solid4(7)
