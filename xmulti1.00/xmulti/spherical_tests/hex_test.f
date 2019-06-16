@@ -197,27 +197,26 @@
       real(8) xxxx,xxxy,xxxz,xxyy,xxyz,xxzz,xyyy,&
      & xyyz,xyzz,xzzz,yyyy,yyyz,yyzz,yzzz,zzzz
       real(8), dimension(9) :: solid4
-      real(8) :: s
+      real(8) :: fac1 = 3.0d0 * dsqrt(70.0d0)/140.0d0, fac2 = dsqrt(14.0d0)/14.0d0,&
+    & fac3 = dsqrt(2.0d0)/4.0d0, fac4 = dsqrt(14.0d0)/28.0d0, fac5 = dsqrt(70.0d0)/140.0d0,&
+    & fac6 = 3.0d0 * dsqrt(7.0d0)/28.0d0, fac7 = dsqrt(7.0d0)/28.0d0, fac8 = dsqrt(70.0d0)/35.0d0,&
+    & fac9 = dsqrt(7.0d0)/7.0d0, fac10 = dsqrt(8.0d0 / 35.0d0)
 
-      s = dsqrt(8.0d0 / 35.0d0)
-
-      xxxx = s * ((3.0d0 / 8.0d0) * solid4(1) - (dsqrt(5.d0)/4.0d0) * solid4(4) + (dsqrt(35.0d0)/8.0d0) * solid4(8))
-      xxxy = s*(1.0d0 / 8.0d0) * (-dsqrt(5.0d0) * solid4(5) + dsqrt(35.0d0) * solid4(9))
-      xxyy = s*((1.0d0 / 8.0d0) * solid4(1) - (dsqrt(35.0d0)/8.0d0) * solid4(8))
-      xyyy = -s*(1.0d0 / 8.0d0) * (dsqrt(5.0d0) * solid4(5) + dsqrt(35.0d0) * solid4(9))
-      yyyy = s*((3.0d0 / 8.0d0) * solid4(1) + (dsqrt(5.0d0)/4.0d0) * solid4(4) + (dsqrt(35.0d0)/8.0d0) * solid4(8))
-      xxxz = s*(1.0d0 / 16.0d0) * (-3.0d0 * dsqrt(10.0d0) * solid4(2) + dsqrt(70.0d0) * solid4(6))
-      xxyz = s*(1.0d0 / 16.0d0) * (-dsqrt(10.0d0) * solid4(3) + dsqrt(70.0d0) * solid4(7))
-      xyyz = -s*(1.0d0 / 16.0d0) * (dsqrt(10.0d0) * solid4(2) + dsqrt(70.0d0) * solid4(6))
-      yyyz = -s*(1.0d0 / 16.0d0) * (3.0d0 * dsqrt(10.0d0) * solid4(3) + dsqrt(70.0d0) * solid4(7))      
-
-      xxzz = s*(-0.5d0 * solid4(1) + (dsqrt(5.0d0)/4.0d0) * solid4(4))
-
-      xyzz = s*(dsqrt(5.0d0)/4.0d0) * solid4(5)
-      yyzz = s*(-0.5d0 * solid4(1) - (dsqrt(5.0d0)/4.0d0 ) * solid4(4))
-      xzzz = s*dsqrt(5.0d0 / 8.0d0) * solid4(2)
-      yzzz = s*dsqrt(5.0d0 / 8.0d0) * solid4(3)
-      zzzz = s*solid4(1)
+      xxxx = fac1 * solid4(1) - fac2 * solid4(4) + fac3 * solid4(8)
+      xxxy = -fac4 * solid4(5) + fac3 * solid4(9)
+      xxyy =  fac5 * solid4(1) - fac3 * solid4(8)
+      xyyy = -fac4 * solid4(5) + fac3 * solid4(9)
+      yyyy = fac1 * solid4(1) + fac2 * solid4(4) + fac3 * solid4(8)
+      xxxz =  - fac6 * solid4(2) + 0.25d0 * solid4(6)
+      xxyz =  - fac7 * solid4(3) + 0.25d0 * solid4(7)
+      xyyz = - fac7 * solid4(2) - 0.25d0 * solid4(6)
+      yyyz = - fac6 * solid4(3) - 0.25d0 * solid4(7)
+      xxzz = - fac8 * solid4(1) + fac2 * solid4(4)
+      xyzz = fac2 * solid4(5)
+      yyzz = - fac8 * solid4(1) - fac2 * solid4(4)
+      xzzz = fac9 * solid4(2)
+      yzzz = fac9 * solid4(3)
+      zzzz = fac10 * solid4(1)
       
       end subroutine convert_hex_to_cartesian
 
@@ -230,9 +229,10 @@
      & xyyz,xyzz,xzzz,yyyy,yyyz,yyzz,yzzz,zzzz
       real(8), dimension(9) :: solid4
       real(8) xxrr,xyrr,xzrr,yyrr,yzrr,zzrr,rrrr
-      real(8) :: s
-
-      s = dsqrt(8.0d0/35.0d0) 
+      real(8) :: fac1 = dsqrt(70.0d0)/4.0d0, fac2 = 3.0d0 * dsqrt(5.0d0/14.0d0),&
+     & fac3 = 3.0d0 * dsqrt(70.0d0)/140.0d0, fac4 = dsqrt(7.0d0)/7.0d0,&
+     & fac5 = dsqrt(14.0d0)/14.0d0,fac6 = dsqrt(2.0d0/7.0d0),&
+     & fac7 = dsqrt(2.0d0)/4.0d0, fac8 = dsqrt(2.0d0)
 
       xxrr = xxxx + xxyy + xxzz
       yyrr = xxyy + yyyy + yyzz
@@ -241,23 +241,23 @@
       rrrr = xxrr + yyrr + zzrr
 
 !     40
-      solid4(1) = s*(1.0d0/8.0d0) * (35.0d0 * zzzz - 30.0d0 * zzrr + 3.0d0 * rrrr)
+      solid4(1) = fac1 * zzzz - fac2 * zzrr + fac3 * rrrr
 !     41c
-      solid4(2) = s*dsqrt(5.0d0/8.0d0) * (7.0d0 * xzzz - 3.0d0 * xzrr)
+      solid4(2) = fac4 * (7.0d0 * xzzz - 3.0d0 * xzrr)
 !     41s
-      solid4(3) = s*dsqrt(5.0d0/8.0d0) * (7.0d0 * yzzz - 3.0d0 * yzrr)
+      solid4(3) = fac4 * (7.0d0 * yzzz - 3.0d0 * yzrr)
 !     42c
-      solid4(4) = s*dsqrt(5.0d0/16.0d0) * (-xxrr + yyrr + 7.0d0 * (xxzz - yyzz))
+      solid4(4) = fac5 * (-xxrr + yyrr + 7.0d0 * (xxzz - yyzz))
 !     42s
-      solid4(5) = s*dsqrt(5.0d0/4.0d0) * (7.0d0 * xyzz - xyrr)
+      solid4(5) = fac6 * (7.0d0 * xyzz - xyrr)
 !     43c
-      solid4(6) = s*dsqrt(35.0d0/8.0d0) * (xxxz - 3.0d0 * xyyz)
+      solid4(6) = xxxz - 3.0d0 * xyyz
 !     43s
-      solid4(7) = s*dsqrt(35.0d0/8.0d0) * (3.0d0 * xxyz - yyyz)
+      solid4(7) = 3.0d0 * xxyz - yyyz
 !     44c
-      solid4(8) = s*dsqrt(35.0d0/64.0d0) * (xxxx - 6.0d0 * xxyy + yyyy)
+      solid4(8) = fac7 * (xxxx - 6.0d0 * xxyy + yyyy)
 !     44s
-      solid4(9) = s*dsqrt(35.0d0/4.0d0) * (xxxy - xyyy)
+      solid4(9) = fac8 * (xxxy - xyyy)
 
       end subroutine convert_hex_to_spherical
 
