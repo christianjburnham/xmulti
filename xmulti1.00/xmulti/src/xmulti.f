@@ -4209,7 +4209,7 @@
       real(8) :: phi,theta,psi,stheta
       real(8) :: xdif,ydif,zdif
       real(8) :: rdis2
-      character(len = 8) molecule_name
+      character(len = 16) molecule_name
       character(len = 3) atom_name
       character(len=2048) :: buffer
       character(len = 32) :: token
@@ -4266,6 +4266,7 @@
 !     determine the molecule's moltype index by comparing the name to the 
 !     list of names
 
+         moltype = 0
          do k = 1,nmoltypes
             if(molecule_name.eq.molecule_name_list(k)) moltype = k
          end do 
@@ -4428,7 +4429,7 @@
       implicit none
       integer natoms_in_mol,nitems,moltype,k,ios,imol,conformer,iatom
       character(len=2048) :: buffer
-      character(len = 8) molecule_name
+      character(len = 16) molecule_name
       character(len = 2048), dimension(64) :: textlist
       real(8), dimension(:,:), allocatable :: rr
       real(8), dimension(3) :: vec1,vec2
@@ -4458,6 +4459,7 @@
 !     determine the molecule's moltype index by comparing the name to the 
 !     list of names
 
+         moltype = 0 
          do k = 1,nmoltypes
             if(molecule_name.eq.molecule_name_list(k)) moltype = k
          end do 
@@ -6482,7 +6484,7 @@
       use common_data      
       use parse_text
       implicit none
-      character(len = 8) molecule_name
+      character(len = 16) molecule_name
       integer i,j,i1,j1,k,moltype,nconformers,ios
 
       read(43,*,iostat = ios) molecule_name
