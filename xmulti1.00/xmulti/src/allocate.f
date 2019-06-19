@@ -26,11 +26,12 @@
 
       inquire(file = 'size.dat',exist = file_exists)
       if(.not.file_exists) call file_doesnt_exist('size.dat')
+      open(45,file = 'size.dat')
 
       line = 0
 
       do while(.true.)
-         read(10, '(A)', iostat=ios) buffer
+         read(45, '(A)', iostat=ios) buffer
          if(ios.ne.0) exit
          line = line + 1
          call split_text_to_list(buffer,textlist,nitems)
