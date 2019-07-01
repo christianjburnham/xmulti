@@ -83,6 +83,7 @@
 
 
       SUBROUTINE FRPRMN(p,n,ftol,iter,fret)
+      use nr_common_data
       INTEGER iter,n,NMAX,ITMAX
       REAL(8) fret,ftol,p(n),EPS,func
       EXTERNAL func
@@ -116,7 +117,9 @@
 !           call flush(90)
 !           call print_coordinates(89)
 !           call print_rigid_coordinates(88)
-
+        endif
+        if(mod(nsteps,nprintdata).eq.0) then 
+           call print_data
         endif
 
         gg=0.
@@ -211,7 +214,7 @@
 
 
       SUBROUTINE LINMIN(p,xi,n,fret)
-      use common_data
+      use nr_common_data
       INTEGER n,NMAX
       REAL(8) fret,p(n),xi(n),TOL
       PARAMETER (NMAX=60000,TOL=1.d-4)
@@ -248,92 +251,8 @@
       END
 
 
-
-
-
-
-
-real*8 Function BrentRoots( x1, x2, Tolerance,  &
-                            maxIterations,      &
-                            valueAtRoot,        &
-                            niter, error )  
-
-  parameter(FPP = 1.d-11, nearzero = 1.d-20)
-
-  real*8  x1,x2,Tolerance,valueAtRoot,AFunction,Minimum
-  integer niter, error,RootBracketed 
-
-  real*8 resultat, AA, BB, CC, DD, EE, FA, FB, FC, Tol1, PP, QQ, RR, SS, xm
-  integer i, done
-
-  i = 0; done = 0;   error = 0
-  AA = x1;  BB = x2;  FA = AFunction(AA); FB = AFunction(BB)
-  if (RootBracketed(FA,FB).eq.0) then 
-    error = 1
-  else 
-    FC = FB;
-    do while (done.eq.0.and.i < maxIterations)
-      if (RootBracketed(FC,FB).eq.0) then
-        CC = AA; FC = FA; DD = BB - AA; EE = DD
-      endif
-      if (dabs(FC) < dabs(FB)) then
-        AA = BB; BB = CC; CC = AA
-        FA = FB; FB = FC; FC = FA
-      endif
-      Tol1 = 2.0 * FPP * dabs(BB) + 0.5 * Tolerance
-      xm = 0.5 * (CC-BB)
-      if ((dabs(xm) <= Tol1).or.(dabs(FA) < nearzero)) then
-        ! A root has been found
-        resultat = BB;
-        done = 1
-        valueAtRoot = AFunction(resultat)
-      else 
-        if ((dabs(EE) >= Tol1).and.(dabs(FA) > dabs(FB))) then
-          SS = FB/ FA;
-          if (dabs(AA - CC) < nearzero) then
-            PP = 2.0 * xm * SS;
-            QQ = 1.0 - SS;
-          else 
-            QQ = FA/FC;
-            RR = FB /FC;
-            PP = SS * (2.0 * xm * QQ * (QQ - RR) - (BB-AA) * (RR - 1.0));
-            QQ = (QQ - 1.0) * (RR - 1.0) * (SS - 1.0);
-          endif
-          if (PP > nearzero) QQ = -QQ;
-          PP = dabs(PP);
-          if ((2.0 * PP) < Minimum(3.0*xm *QQ-dabs(Tol1 * QQ), dabs(EE * QQ))) then
-            EE = DD;  DD = PP/QQ;
-          else 
-            DD = xm;   EE = DD;
-          endif
-        else 
-          DD = xm;
-          EE = DD;
-        endif
-        AA = BB;
-        FA = FB;
-        if (dabs(DD) > Tol1) then 
-          BB = BB + DD;
-        else 
-          if (xm > 0) then 
-                 BB = BB + dabs(Tol1)
-          else 
-                 BB = BB - dabs(Tol1)
-          endif
-        endif
-        FB = AFunction(BB)
-        i=i+1
-      endif
-      end do
-    if (i >= maxIterations) error = 2
-  endif
-  niter = i
-  BrentRoots = resultat
-end ! BrentRoots()
-
-
       subroutine sincos(angle,sine,cosine)
-      use common_data
+      use nr_common_data
       implicit none
       integer ix,xsign
       integer ssign,csign
@@ -805,15 +724,6 @@ end ! BrentRoots()
       return
       END
 
-
-! Test function for Brent method
-real*8 Function AFunction(x)
-      use common_data
-      implicit none
-      real*8 x,gg
-      gg = 1.d0/ (4.0d0 * ewald_eps*ewald_eps)
-      AFunction = 1.d-7 - (exp(-gg * x*x)  / (x*x) ) 
-end
 
 ! TRUE if x1*x2 negative
 integer Function RootBracketed(x1,x2)
