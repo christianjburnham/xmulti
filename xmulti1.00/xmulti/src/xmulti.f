@@ -291,6 +291,7 @@
 
       subroutine set_units()
       use common_data
+      use nr_common_data
       implicit none
 
 !     sets all the units used in the simulation
@@ -355,6 +356,7 @@
       subroutine minimize()
 !     finds the local minimum
       use common_data
+      use nr_common_data
       use nr_mod
       implicit none
       integer i,j
@@ -391,6 +393,7 @@
       endif
       ftol = mintol
       linmin_param = 1.d-9
+      nprintdata = 2000
 
       call frprmn(xvec,n,ftol,iter,fret)
 
@@ -992,6 +995,7 @@
 !     CALCULATES THE RECIPROCAL SPACE ENERGY + FORCES
 !----------------------------------------------
       use common_data
+      use nr_common_data
       use nr_mod
       implicit none
 
@@ -6674,4 +6678,7 @@
       
       end subroutine get_lab_spherical3
 
-
+      subroutine print_data
+!     dummy subroutine for nr_mod call-back during minimization. But can be used to 
+!     print results during a relaxation.
+      end subroutine print_data
