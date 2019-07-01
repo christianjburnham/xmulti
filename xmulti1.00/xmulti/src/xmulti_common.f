@@ -46,7 +46,6 @@
       logical :: rigid,periodic
       real(8), dimension(:,:), allocatable :: rfrac
       real(8) :: cmax
-      real(8) :: pifac
       integer, dimension(:), allocatable :: dimensionality
       integer :: n2bonds,n3bonds,n2bondtypes,n3bondtypes
       real(8), dimension(:,:), allocatable :: bond_splinecoeff,bond_xspline,bond_yspline
@@ -79,7 +78,7 @@
       integer(8) nbondlist,npair,nmodel_param
       character(len = 32) :: batch_file
       real(8) :: swap_chance,swap_conformer_chance
-      real(8) :: mintol,linmin_param
+      real(8) :: mintol
       integer max_rank
       integer, dimension(:), allocatable :: mol_conformer,mol_nconformers
       real(8), dimension(:,:), allocatable :: mol_conformer_energy
