@@ -16,7 +16,7 @@
       implicit none
       character(len = 10) :: mintype
       character(len = 8) :: antype
-      real(8) :: basin_temp,press,radius,ewald_error,schance,tolerance
+      real(8) :: basin_temp,press,radius,d_radius,ewald_error,schance,tolerance
       real(8) :: delta_frac,delta_xyz,delta_cvec,delta_angle,delta
       character(len = 32), dimension(1024) :: control_list
       real(8), dimension(1024,8) :: param_list
@@ -29,7 +29,7 @@
       character(len=6) :: version
       character(len=32) :: arg
 
-      version = '1.01'
+      version = '1.02'
       
       do i = 1,command_argument_count()
          call get_command_argument(i, arg)
@@ -69,6 +69,7 @@
       mintol = 0.0d0 
       swap_chance = 0.0d0 
       use_spline = .true.
+      rdamp_userset = .false.
       calc_fm = .false.
       pefac = fac(3)
       output_energy_unit = 'kJ/mol'
@@ -93,8 +94,6 @@
 
       call read_control(control_list,param_list,ncontrol)
       call read_molecular_geometry
-      call set_default_transition_probability
-      call read_conformer_transition_probability
       call get_cell_mass()
 
       if(periodic) then
@@ -204,6 +203,13 @@
             write(*,30) radius
  30         format('SETTING CUT-OFF RADIUS TO',f10.6,' ANGSTROMS')
             if(periodic) call ewald_setup(radius,ewald_error)
+         case('RDAMP_CUT')
+            d_radius = param_list(n,1)
+            write(*,*)
+            write(*,31) d_radius
+ 31         format('SETTING CHARGE-DAMPING &
+     &CUT-OFF RADIUS TO',f10.6,' ANGSTROMS')
+            call set_rdampcut(d_radius)
          case('BASIN RMIN')
             rmin = param_list(n,1)
             write(*,*)
@@ -3314,6 +3320,11 @@
                ncontrol = ncontrol + 1
                control_list(ncontrol) = 'RCUT'
                param_list(ncontrol,1) = radius
+            case('RDAMP_CUT')
+               read(textlist(2),*,iostat = ios) radius
+               ncontrol = ncontrol + 1
+               control_list(ncontrol) = 'RDAMP_CUT'
+               param_list(ncontrol,1) = radius
             case('INPUT')
                if(textlist(2).eq.'UNITS') then
                   if(textlist(3).eq.'KJ') then
@@ -5131,7 +5142,8 @@
       implicit none
       real(8) :: rdamp
       damp_width = rdamp
-      rdamp_cutoff = 4.0d0 * damp_width
+!     default value, if not set by user
+      if(.not.rdamp_userset) rdamp_cutoff = 4.0d0 * damp_width
       eps_damp = 1.0d0/(dsqrt(2.0d0) * damp_width)
       eps_damp_sqrtpii = 1.0d0/(eps_damp*dsqrt(pi))
       end subroutine set_damp
@@ -6459,59 +6471,15 @@
       end do
       end subroutine CALC_CONFORMER_ENERGY
 
-      subroutine set_default_transition_probability
-      use common_data      
+      subroutine set_rdampcut(radius)
+      use common_data
       implicit none
-      integer imoltype,i,j,nconformers
-      
-      do imoltype = 1,nmoltypes
-         nconformers = mol_nconformers(imoltype)
-         if(nconformers.gt.1) then 
-            do i = 1,nconformers
-               do j = 1,nconformers
-                  if(i.ne.j) then 
-!     assign equal probabilities for the non-zero transitions 
-                     trans_mat(0,i,j,imoltype) = 1.0d0 / dble(nconformers - 1)
-                  else
-                     trans_mat(0,i,j,imoltype) = 0.0d0 
-                  endif
-                  trans_mat(1:3,i,j,imoltype) = 0.0d0 
-               end do 
-            end do 
-         endif
-      end do 
-      
-      end subroutine set_default_transition_probability
-
-
-      subroutine read_conformer_transition_probability
-      use common_data      
-      use parse_text
-      implicit none
-      character(len = 16) molecule_name
-      integer i,j,i1,j1,k,moltype,nconformers,ios
-
-      read(43,*,iostat = ios) molecule_name
-      molecule_name = upcase(molecule_name)
-      if(ios.ne.0) return
-
-      moltype = 0
-      do k = 1,nmoltypes
-         if(molecule_name.eq.molecule_name_list(k)) moltype = k
-      end do 
-      if(moltype.eq.0) then 
-            write(*,*) 'ERROR: molecule name ',molecule_name,&
-    & 'in prob file does not correspond to molecule in list'
-      stop
-      endif
-      nconformers = mol_nconformers(moltype)
-
-      do i = 1,nconformers
-         do j = 1,nconformers
-            read(43,*) i1,j1,trans_mat(:,i,j,moltype)
-         end do 
-      end do 
-      end subroutine read_conformer_transition_probability
+      real(8) :: radius
+      rdamp_cutoff = radius
+!     flag indicates whether the rdamp_cutoff variable was set by the user
+!     or whether the default value should be used.
+      rdamp_userset = .true.
+      end subroutine set_rdampcut
 
       subroutine assign_multipoles(nmult,iatom,conformer,moltype,multipole_vec)
       use common_data
@@ -6682,3 +6650,4 @@
 !     dummy subroutine for nr_mod call-back during minimization. But can be used to 
 !     print results during a relaxation.
       end subroutine print_data
+
