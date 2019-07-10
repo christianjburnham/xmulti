@@ -43,7 +43,7 @@
       real(8) :: ewald_eps,kcut,rcut,rcut2
       real(8) :: eps_sqrtpii
       real(8), dimension(3,3) :: dudcvec,dudcvec_coulomb,dudcvec_pair,dudcvec_intra,dudcvec_pv
-      logical :: rigid,periodic
+      logical :: rigid,periodic,rdamp_userset
       real(8), dimension(:,:), allocatable :: rfrac
       real(8) :: cmax
       integer, dimension(:), allocatable :: dimensionality
