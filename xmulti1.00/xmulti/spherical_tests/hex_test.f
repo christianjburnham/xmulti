@@ -149,6 +149,13 @@
       write(*,*) 'trace(a)_xz',a_xxxz+a_xyyz+a_xzzz
       write(*,*) 'trace(a)_yz',a_xxyz+a_yyyz+a_yzzz
 
+      write(*,*) 'trace(b)_xx',b_xxxx+b_xxyy+b_xxzz
+      write(*,*) 'trace(b)_yy',b_xxyy+b_yyyy+b_yyzz
+      write(*,*) 'trace(b)_zz',b_xxzz+b_yyzz+b_zzzz
+      write(*,*) 'trace(b)_xy',b_xxxy+b_xyyy+b_xyzz
+      write(*,*) 'trace(b)_xz',b_xxxz+b_xyyz+b_xzzz
+      write(*,*) 'trace(b)_yz',b_xxyz+b_yyyz+b_yzzz
+
 !     calculate the inner product in two ways.
 
       sum1 = a_xxxx * b_xxxx & 
