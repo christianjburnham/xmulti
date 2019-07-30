@@ -4214,7 +4214,7 @@
       use parse_text
       implicit none
       integer ios
-      real(8), dimension(3,500) :: rr
+      real(8), allocatable, dimension(:,:) :: rr
       real(8) :: comx,comy,comz,totmass
       real(8), dimension(3) :: vec1,vec2
       real(8) :: x1,y1,z1,x2,y2,z2,x3,y3,z3
@@ -4239,6 +4239,7 @@
 
       allocate(euler_conf(3,nconformer_max))
       allocate(error_conf(nconformer_max))
+      allocate(rr(3,natom_max))
 
       write(*,*) 
       write(*,*) 'READING XYZ INPUT COORDINATES'
