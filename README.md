@@ -1,7 +1,7 @@
 **************************************************************
-***     README FOR XMULTI V1.00
+***     README FOR XMULTI V1.03
 ***
-***     Christian J Burnham, UCD, 2018, christianjburnham@gmail.com
+***     Christian J Burnham, UCD, 2019, christianjburnham@gmail.com
 ***
 **************************************************************
 
