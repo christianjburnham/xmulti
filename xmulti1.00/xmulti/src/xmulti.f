@@ -29,7 +29,7 @@
       character(len=6) :: version
       character(len=32) :: arg
 
-      version = '1.02'
+      version = '1.03'
       
       do i = 1,command_argument_count()
          call get_command_argument(i, arg)
@@ -4223,15 +4223,25 @@
       real(8), dimension(3,3) :: axes0,axes,axes0i,rotmat
       real(8) :: phi,theta,psi,stheta
       real(8) :: xdif,ydif,zdif
-      real(8) :: rdis2
+      real(8) :: rdis2,error2,error,error_min
+      real(8), allocatable, dimension(:) :: error_conf
+      real(8), allocatable, dimension(:,:) :: euler_conf
+      real(8), dimension(3) :: r0,r1
       character(len = 16) molecule_name
       character(len = 3) atom_name
       character(len=2048) :: buffer
       character(len = 32) :: token
       character(len = 2048), dimension(64) :: textlist
       integer imol,moltype,natoms_in_mol,iatom
-      integer k,anchor1,anchor2,anchor3,conformer,nitems,nitem
-      logical okflag
+      integer k,anchor1,anchor2,anchor3,conformer,conf_best,nitems,nitem,ivec
+      integer iconf_min,iconf_max
+      logical okflag,find_conformer
+
+      allocate(euler_conf(3,nconformer_max))
+      allocate(error_conf(nconformer_max))
+
+      write(*,*) 
+      write(*,*) 'READING XYZ INPUT COORDINATES'
 
 !     anchor1,anchor2,anchor3 are the indices of the particles which are used to construct the axes.
 
@@ -4243,6 +4253,9 @@
       nmoloftype = 0  
       nmassatoms = 0 
       do imol = 1,nmol
+
+         find_conformer = .true.
+
          read(10, '(A)', iostat=ios) buffer
          call split_text_to_list(buffer,textlist,nitems)
 
@@ -4264,6 +4277,7 @@
             case('CONFORMER')
                nitem = nitem + 1
                read(textlist(nitem),*) conformer
+               find_conformer = .false.
             case('ANCHORS')
                nitem = nitem + 1
                read(textlist(nitem),*) anchor1
@@ -4277,6 +4291,7 @@
                stop
             end select
          end do 
+
 
 !     determine the molecule's moltype index by comparing the name to the 
 !     list of names
@@ -4304,7 +4319,6 @@
          endif
 
          mol_type(imol) = moltype
-         mol_conformer(imol) = conformer
          nmoloftype(moltype) = nmoloftype(moltype) + 1
          natoms_in_mol = mol_nmassatoms(moltype)
          nmassatoms = nmassatoms + natoms_in_mol
@@ -4329,7 +4343,7 @@
          do iatom = 1,natoms_in_mol
             read(10,*,iostat = ios) atom_name,rr(1,iatom),rr(2,iatom),rr(3,iatom)
             if(ios.ne.0) then 
-               write(*,*) 'EROR READING INPUT FILE. &
+               write(*,*) 'ERROR READING INPUT FILE. &
      & PROBLEM WITH NUMBER OF MOLECULES?'
                stop
             endif
@@ -4397,43 +4411,91 @@
 
          call get_axes(x1,y1,z1,x2,y2,z2,x3,y3,z3,axes)
 
-!     find the axes for the reference molecule
+         error_min = 1.d+23
 
+!     decide whether to search for best conformer, or use the one in the input file
+
+         if(find_conformer) then 
+            iconf_min = 1
+            iconf_max = mol_nconformers(moltype)
+         else
+            iconf_min = conformer
+            iconf_max = conformer
+         endif
+
+         
+         conformer_loop: do conformer = iconf_min,iconf_max
+         
+!     find the axes for the reference molecule
+         
          x1 = site_coord0(1,anchor1,conformer,moltype)
          y1 = site_coord0(2,anchor1,conformer,moltype)
          z1 = site_coord0(3,anchor1,conformer,moltype)
-
+         
          x2 = site_coord0(1,anchor2,conformer,moltype)
          y2 = site_coord0(2,anchor2,conformer,moltype)
          z2 = site_coord0(3,anchor2,conformer,moltype)
-
+         
          if(mol_nmassatoms(moltype).eq.2) then
-
+            
             x21 = x2 - x1
             y21 = y2 - y1
             z21 = z2 - z1
-
+            
             x3 = ay * z21 - az * y21
             y3 = az * x21 - ax * z21
             z3 = ax * y21 - ay * x21
-
+            
          else
             x3 = site_coord0(1,anchor3,conformer,moltype)
             y3 = site_coord0(2,anchor3,conformer,moltype)
             z3 = site_coord0(3,anchor3,conformer,moltype)
          endif
-
+         
          call get_axes(x1,y1,z1,x2,y2,z2,x3,y3,z3,axes0)
-
+         
          call mat3inverse(axes0,axes0i,okflag)
          rotmat = matmul(axes,axes0i)
-
+         
          call get_euler_from_rotmat(rotmat,phi,theta,psi)
-
-         mol_euler(1,imol) = phi
-         mol_euler(2,imol) = theta
-         mol_euler(3,imol) = psi
-
+         
+         euler_conf(1,conformer) = phi
+         euler_conf(2,conformer) = theta
+         euler_conf(3,conformer) = psi
+         
+!     calculate the error with this conformer 
+         
+         call get_rotmat(phi,theta,psi,rotmat)         
+         
+         error2 = 0.0d0 
+         do iatom = 1,natoms_in_mol
+            do ivec = 1,3
+               r0(ivec) = site_coord0(ivec,iatom,conformer,moltype)
+            end do 
+            r1 = matmul(rotmat,r0)
+            xdif = rr(1,iatom) - comx
+            ydif = rr(2,iatom) - comy
+            zdif = rr(3,iatom) - comz
+            error2 = error2 + (xdif - r1(1))**2 + (ydif - r1(2))**2 + (zdif - r1(3))**2
+         end do 
+         error = dsqrt(error2/dble(natoms_in_mol))
+         error_conf(conformer) = error
+         if(error.lt.error_min) then 
+            error_min = error
+            conf_best = conformer
+         endif
+         
+      end do conformer_loop
+      
+      if(find_conformer) write(*,*) 'MOLECULE',imol,' BEST CONFORMER = '&
+     &     ,conf_best,' RMS ERROR = ',error_conf(conf_best)
+      
+      mol_euler(1,imol) = euler_conf(1,conf_best)
+      mol_euler(2,imol) = euler_conf(2,conf_best)
+      mol_euler(3,imol) = euler_conf(3,conf_best)
+      
+      mol_conformer(imol) = conf_best
+      
       end do 
 
       end subroutine read_xyz_input
