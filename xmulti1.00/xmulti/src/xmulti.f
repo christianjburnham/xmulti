@@ -2867,7 +2867,8 @@
             y = lab_coord(2,iatom,imol)
             z = lab_coord(3,iatom,imol)
             atomic_name = site_name(moltype,iatom)
-            if(atomic_name.ne.'X') then 
+!     only write out atoms with mass
+            if(dabs(mass(iatom,moltype)).gt.1.d-10) then
                write(ifile,*) atomic_name,x,y,z
             endif
          end do 
@@ -3771,7 +3772,7 @@
 
                pair_index(iatom,moltype) = index
                mass(iatom,moltype) = dmass
-               if(atname.ne.'X') nmass_atoms_in_mol = nmass_atoms_in_mol + 1
+               if(abs(dmass).gt.1.d-10) nmass_atoms_in_mol = nmass_atoms_in_mol + 1
                if(index.gt.model_index_max) model_index_max = index
             end do 
 
@@ -4733,12 +4734,10 @@
             totmass = 0.0d0 
             
             do iatom = 1,mol_natoms(imoltype)
-               if(site_name(imoltype,iatom).ne.'X') then
-                  xcom = xcom + site_coord0(1,iatom,conformer,imoltype) * mass(iatom,imoltype)
-                  ycom = ycom + site_coord0(2,iatom,conformer,imoltype) * mass(iatom,imoltype)
-                  zcom = zcom + site_coord0(3,iatom,conformer,imoltype) * mass(iatom,imoltype)
-                  totmass = totmass + mass(iatom,imoltype)
-               endif
+               xcom = xcom + site_coord0(1,iatom,conformer,imoltype) * mass(iatom,imoltype)
+               ycom = ycom + site_coord0(2,iatom,conformer,imoltype) * mass(iatom,imoltype)
+               zcom = zcom + site_coord0(3,iatom,conformer,imoltype) * mass(iatom,imoltype)
+               totmass = totmass + mass(iatom,imoltype)
             end do 
             
             xcom = xcom / totmass
