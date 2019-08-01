@@ -29,7 +29,7 @@
       character(len=6) :: version
       character(len=32) :: arg
 
-      version = '1.03'
+      version = '1.031'
       
       do i = 1,command_argument_count()
          call get_command_argument(i, arg)
