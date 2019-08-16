@@ -29,7 +29,7 @@
       character(len=6) :: version
       character(len=32) :: arg
 
-      version = '1.031'
+      version = '1.1'
       
       do i = 1,command_argument_count()
          call get_command_argument(i, arg)
@@ -144,6 +144,7 @@
          case('ENERGY')
             write(*,*)
             write(*,*) 'CALLING ENERGY'
+            if(polarizable) call minimize_dipoles
             call energy()
             write(*,*) 'ENERGIES IN ',output_energy_unit
             write(*,17) 'utotal = ',utotal * pefac
@@ -280,21 +281,6 @@
       end subroutine ewald_setup
       
 
-      subroutine copyvec(a,b)
-      use common_data
-      implicit none
-      integer ivec,imol
-      real(8), dimension(3,*) :: a,b
-      
-      do imol = 1,nmol
-         do ivec = 1,3
-            b(ivec,imol) = a(ivec,imol)
-         end do 
-      end do 
-      
-      end subroutine copyvec
-
-
       subroutine set_units()
       use common_data
       use nr_common_data
@@ -303,6 +289,7 @@
 !     sets all the units used in the simulation
 
       pi = 4.0d0 * atan(1.0d0)
+      sqrtpi = dsqrt(pi)
       eps0 = 8.854187817d-12
       avsno = 6.022d23
 
@@ -358,6 +345,13 @@
 
       end subroutine set_units
 
+      subroutine minimize_dipoles()
+      use common_data
+      implicit none
+      min_dipoles_only = .true.
+      call minimize()
+      min_dipoles_only = .false.
+      end subroutine minimize_dipoles
 
       subroutine minimize()
 !     finds the local minimum
@@ -369,27 +363,42 @@
       real(8) :: xvec(60000)
       real(8) :: ftol,fret
       integer :: imol,n,ieuler,ivec,jvec,iter,moltype,imode
+      integer :: natoms_in_mol,iatom
       character(len = 10) :: mintype
+
+      print_energies = .true.
+      if(min_dipoles_only) print_energies = .false.
       
       n = 0
       do imol = 1,nmol
          moltype = mol_type(imol)
-         do ivec = 1,3
-            n = n + 1
-            if(periodic) then
-               xvec(n) = rfrac(ivec,imol)
-            else
-               xvec(n) = mol_com(ivec,imol)
-            endif
-         end do 
-         if(dimensionality(moltype).gt.0) then 
-            do ieuler = 1,3
+         natoms_in_mol = mol_natoms(moltype)
+         if(.not.min_dipoles_only) then          
+            do ivec = 1,3
                n = n + 1
-               xvec(n) = mol_euler(ieuler,imol)
+               if(periodic) then
+                  xvec(n) = rfrac(ivec,imol)
+               else
+                  xvec(n) = mol_com(ivec,imol)
+               endif
+            end do 
+            if(dimensionality(moltype).gt.0) then 
+               do ieuler = 1,3
+                  n = n + 1
+                  xvec(n) = mol_euler(ieuler,imol)
+               end do 
+            endif
+         endif
+         if(polarizable) then 
+            do iatom = 1,natoms_in_mol
+               do ivec = 1,3
+                  n = n + 1
+                  xvec(n) = lab_ind_dipole(ivec,iatom,imol)
+               end do 
             end do 
          endif
       end do 
-      if(periodic) then
+      if(.not.min_dipoles_only.and.periodic) then
          do ivec = 1,3
             do jvec = 1,ivec
                n = n + 1
@@ -397,18 +406,26 @@
             end do 
          end do 
       endif
+
       ftol = mintol
       linmin_param = 1.d-9
       nprintdata = 2000
 
       call frprmn(xvec,n,ftol,iter,fret)
 
+      if(min_dipoles_only) then 
+         call get_lab_dipole()
+      else
+
       if(periodic) then 
            call generate_cartesians_from_frac()
         else
            call generate_cartesians()
         endif
+      endif
+
       call energy()
+
       end subroutine minimize
 
       real(8) function func(xvec)
@@ -416,28 +433,40 @@
       implicit none
       real(8) :: xvec(60000)
       integer :: imol,n,ieuler,ivec,jvec,iter,moltype,imode
+      integer :: iatom,natoms_in_mol
 
       func = 0.0d0 
 
       n = 0 
       do imol = 1,nmol
          moltype = mol_type(imol)
-         do ivec = 1,3
-            n = n + 1
-            if(periodic) then
-               rfrac(ivec,imol) = xvec(n)
-            else
-               mol_com(ivec,imol) = xvec(n)
-            endif
-         end do 
-         if(dimensionality(moltype).gt.0) then
-            do ieuler = 1,3
+         natoms_in_mol = mol_natoms(moltype)
+         if(.not.min_dipoles_only) then 
+            do ivec = 1,3
                n = n + 1
-               mol_euler(ieuler,imol) = xvec(n)
+               if(periodic) then
+                  rfrac(ivec,imol) = xvec(n)
+               else
+                  mol_com(ivec,imol) = xvec(n)
+               endif
+            end do 
+            if(dimensionality(moltype).gt.0) then
+               do ieuler = 1,3
+                  n = n + 1
+                  mol_euler(ieuler,imol) = xvec(n)
+               end do 
+            endif
+         endif
+         if(polarizable) then 
+            do iatom = 1,natoms_in_mol
+               do ivec = 1,3
+                  n = n + 1
+                  lab_ind_dipole(ivec,iatom,imol) = xvec(n)
+               end do 
             end do 
          endif
       end do 
-      if(periodic) then
+      if(.not.min_dipoles_only.and.periodic) then
          do ivec = 1,3
             do jvec = 1,ivec
                n = n + 1
@@ -450,18 +479,20 @@
          end do 
       endif
 
-      if(periodic) then
-         call generate_cartesians_from_frac()
+      if(min_dipoles_only) then 
+         call get_lab_dipole()
       else
-         call generate_cartesians()
+         if(periodic) then
+            call generate_cartesians_from_frac()
+         else
+            call generate_cartesians()
+         endif
       endif
+
       call energy()
 
       call calculate_rigid_body_forces()
       if(periodic) call get_rigid_frac_forces()
-
-!      call print_coordinates(88)
-!      write(*,*) 'uuu',utotal * pefac
 
       func = utotal * pefac
 
@@ -472,26 +503,40 @@
       implicit none
       real(8) :: xvec(60000),gvec(60000)
       integer :: imol,n,ieuler,ivec,jvec,iter,moltype,imode
+      integer :: natoms_in_mol,iatom
 
       n = 0 
       do imol = 1,nmol
          moltype = mol_type(imol)
-         do ivec = 1,3
-            n = n + 1
-            if(periodic) then
-               gvec(n) = -fracforcemol(ivec,imol) * pefac
-            else
-               gvec(n) = -forcemol(ivec,imol) * pefac
-            endif
-         end do 
-         if(dimensionality(moltype).gt.0) then 
-            do ieuler = 1,3
+         natoms_in_mol = mol_natoms(moltype)
+         if(.not.min_dipoles_only) then 
+            do ivec = 1,3
                n = n + 1
-               gvec(n) = -dudeulermol(ieuler,imol) * pefac
+               if(periodic) then
+                  gvec(n) = -fracforcemol(ivec,imol) * pefac
+               else
+                  gvec(n) = -forcemol(ivec,imol) * pefac
+               endif
+            end do 
+            if(dimensionality(moltype).gt.0) then 
+               do ieuler = 1,3
+                  n = n + 1
+                  gvec(n) = -dudeulermol(ieuler,imol) * pefac
+               end do 
+            endif
+         endif
+         if(polarizable) then 
+            do iatom = 1,natoms_in_mol
+               do ivec = 1,3
+                  n = n + 1
+                  gvec(n) = lab_ind_dipole(ivec,iatom,imol)/(polarizability(iatom,moltype)/fac(2))*pefac & 
+     &                 - efield_ext(ivec) * pefac & 
+     &                 + fac(2) * (dfield(ivec,iatom,imol) + dfield_intra(ivec,iatom,imol)) * pefac
+               end do 
             end do 
          endif
       end do 
-      if(periodic) then
+      if(.not.min_dipoles_only.and.periodic) then
          do ivec = 1,3
             do jvec = 1,ivec
                n = n + 1
@@ -500,7 +545,84 @@
          end do 
       endif
 
+
       end subroutine dfunc
+
+      subroutine test_ind_dipole_derivatives(delta)
+      use common_data
+      implicit none
+      integer moltype,natoms_in_mol,i,j,iatom
+      integer ivec,imol
+      real(8), dimension(:,:,:), allocatable :: dfield0,lab_ind_dipole0
+      real(8) :: delta,utot0,utot1,utot2,force_numeric,force_analytic
+      character(len = 1),dimension(3) :: direction
+
+      direction = (/'x','y','z'/)
+
+      if(.not.polarizable) then
+         write(*,*) 'WARNING: POLARIZABILITY SWITCHED OFF. &
+     &ABORTING TEST DFORCES.'
+         return
+      endif
+
+      call generate_cartesians()
+      call energy()
+
+      utot0 = utotal
+
+      allocate(dfield0(3,natom_max,nmol_max))
+      allocate(lab_ind_dipole0(3,natom_max,nmol_max))
+
+      do imol = 1,nmol
+         moltype = mol_type(imol)
+         natoms_in_mol = mol_natoms(moltype)
+         do iatom = 1,natoms_in_mol
+            do ivec = 1,3
+               dfield0(ivec,iatom,imol) = dfield_intra(ivec,iatom,imol) + dfield(ivec,iatom,imol)
+               lab_ind_dipole0(ivec,iatom,imol) = lab_ind_dipole(ivec,iatom,imol)
+            end do 
+         end do 
+      end do 
+      
+      do imol = 1,nmol
+         moltype = mol_type(imol)
+         natoms_in_mol = mol_natoms(moltype)
+
+         do iatom = 1,natoms_in_mol
+            do ivec = 1,3
+               lab_ind_dipole(ivec,iatom,imol) = lab_ind_dipole(ivec,iatom,imol) + delta
+
+               call generate_cartesians()
+               call energy()
+               utot1 = utotal
+
+               lab_ind_dipole(ivec,iatom,imol) = lab_ind_dipole(ivec,iatom,imol) - 2.0d0 * delta
+
+
+               call generate_cartesians()
+               call energy()
+               utot2 = utotal
+
+
+               force_numeric = (utot2 - utot1) / (2.0d0 * delta)
+
+               force_analytic = -lab_ind_dipole0(ivec,iatom,imol)/(polarizability(iatom,moltype)/fac(2)) & 
+     &              +efield_ext(ivec) - fac(2) * dfield0(ivec,iatom,imol) 
+
+               write(*,17) imol,iatom,direction(ivec),force_numeric * pefac,force_analytic*pefac,&
+     & force_numeric / force_analytic
+ 17            format('mol ',i5,' atom ',i5,a3,' numerical ',f14.6,&
+     &'    analytical ',f14.6,' ratio ',f14.6)
+
+               lab_ind_dipole(ivec,iatom,imol) = lab_ind_dipole(ivec,iatom,imol) + delta
+
+            end do 
+         end do 
+      end do 
+
+
+      end subroutine test_ind_dipole_derivatives
+
 
       subroutine TEST_CVEC_DERIVATIVES(delta)
 !     tests the derivatives with respect to the cell vectors.
@@ -718,7 +840,6 @@
             force0(ivec,iatom,imol) = force(ivec,iatom,imol)
             end do 
          end do 
-         
       end do 
 
       do imol = 1,nmol
@@ -946,6 +1067,9 @@
             if(max_rank.ge.1) then
                do ivec = 1,3
                   dfield(ivec,iatom,imol) = 0.0d0 
+                  if(polarizable) then
+                     dfield_intra(ivec,iatom,imol) = 0.0d0 
+                  endif
                   if(max_rank.ge.2) then 
                      do jvec = 1,3
                         qfield(ivec,jvec,iatom,imol) = 0.0d0 
@@ -963,6 +1087,7 @@
             if(max_rank.ge.1) then 
                do ii = 1,3
                   fieldtens1(ii,iatom,imol) = 0.0d0 
+                  if(polarizable) fieldtens1_intra(ii,iatom,imol) = 0.0d0 
                end do 
             endif
             if(max_rank.ge.2) then 
@@ -1549,6 +1674,8 @@
       upair = 0.0d0 
       upv = 0.0d0 
       uconformer = 0.0d0 
+      uspring = 0.0d0 
+      uext = 0.0d0
       
       dudcvec_coulomb = 0.0d0 
       dudcvec_intra = 0.0d0 
@@ -1564,6 +1691,10 @@
       endif
       call real
       call calc_elec
+
+      call calc_uext
+
+      if(polarizable) call calc_spring
       call calc_conformer_energy
 
       if(periodic) then 
@@ -1573,6 +1704,12 @@
 
       dudcvec = dudcvec_coulomb + dudcvec_pair + dudcvec_intra + dudcvec_pv
       utotal = utotal + ucharge + udipole + uquad + uoct + upair + upv + uconformer
+
+      if(polarizable) then 
+         utotal = utotal + uspring
+      endif
+
+      utotal = utotal + uext
 
       end subroutine energy
 
@@ -1589,8 +1726,8 @@
       integer :: jcell1max,jcell2max,jcell3max
       integer nmax,irank,jrank
       real(8) :: xi,yi,zi,xj,yj,zj
-      real(8), dimension(3)  :: dipi,dipj
-      real(8) :: dipi_d_r,dipj_d_r
+      real(8), dimension(3)  :: dipi,dipj,dip_indi,dip_indj,dip_permi,dip_permj
+      real(8) :: dipi_d_r,dipj_d_r,dip_indi_d_r,dip_indj_d_r
       real(8) :: xdif,ydif,zdif,rdis
       real(8) :: sigma,sigma6,sigma12,epsilon,dupair
       real(8) :: ri,r2i,r3i,r4i,r6i,r12i
@@ -1600,8 +1737,8 @@
       real(8) :: xforce_pair,yforce_pair,zforce_pair
       real(8) :: xforce,yforce,zforce
       real(8), dimension(3) :: force_elec
-      real(8), dimension(0:10) :: pfunc,bfunc,gfunc,tfunc
-      real(8) :: rdis2
+      real(8), dimension(0:10) :: pfunc,bfunc,efunc,gfunc,tfunc,dfunc
+      real(8) :: rdis2,aa,dd
       real(8) :: xxdif,yydif,zzdif
       real(8) :: upair0,switch,rc0,rc1,dupair0,dswitchdss,dswitchdr,ss,dssdr
       real(8) :: diff0,cfield0i,cfield0j
@@ -1614,7 +1751,7 @@
       real(8) :: f1dif,f2dif,f3dif
       real(8) :: f1,f2,f3
       real(8) :: ax,ay,az,bx,by,bz,cx,cy,cz
-      real(8) :: vol
+      real(8) :: vol,tf_power0
       real(8) :: xj0,yj0,zj0,xdif0,ydif0,zdif0
       real(8) :: dcellx,dcelly,dcellz,dcellx0,dcelly0,dcellz0
       real(8) :: xxdif0,yydif0,zzdif0
@@ -1625,7 +1762,8 @@
       real(8) :: dupair0dp1,dupair0dp2
       real(8) :: dupairdp1,dupairdp2
       real(8) :: rspline_max
-      real(8) :: dipi_d_dipj
+      real(8), dimension(200) :: fm_upair,fm_dupair
+      real(8) :: dipi_d_dipj,dip_indi_d_dip_indj
       real(8) :: x,y,z,xf,yf,zf
       real(8) :: quadi_dd_rr,quadj_dd_rr,quadi_d_dipj_d_r,quadj_d_dipi_d_r
       real(8) :: quadi_dd_quadj,quadi_d_r_d_quadj_r_r
@@ -1653,7 +1791,7 @@
       real(8) :: octi_d_r_dd_octj_d_r
       real(8) :: octi_ddd_octj
       real(8) :: octi_ijk,octj_ijk
-      real(8), dimension(0:12) :: ggg
+      real(8), dimension(0:12) :: ggg,gggd
       real(8), dimension(5) :: spherical2i,spherical2j
       real(8), dimension(7) :: spherical3i,spherical3j
       real(8), dimension(5) :: octi_d_r,octj_d_r
@@ -1670,8 +1808,7 @@
       real(8), dimension(7) :: rsolid3
       real(8), dimension(5) :: solid2
       real(8), dimension(3,3) :: solid1_1
-
-      integer mmm
+      real(8) :: polar6i_i,polar6i_j,polar6i_ij
 
       rc0 = rcut * 0.9d0 
       rc1 =  rcut
@@ -1719,9 +1856,16 @@
          i_index = pair_index(iatom,imoltype)
 
          charge_i = lab_charge(iatom,imol)
+         if(damptype.eq.'THOLE') polar6i_i = polar6i(iatom,imoltype)
 
          if(irank.ge.1) then 
             dipi(:) = lab_dipole(:,iatom,imol) 
+            if(polarizable) then 
+               dip_indi(:) = lab_ind_dipole(:,iatom,imol)
+               dip_permi = dipi - dip_indi
+            else
+               dip_permi = dipi
+            endif
          else
             dipi = 0.0d0 
          endif
@@ -1788,9 +1932,19 @@
          endif
 
          charge_j = lab_charge(jatom,jmol)
+         if(damptype.eq.'THOLE') then 
+            polar6i_j = polar6i(jatom,jmoltype)
+            polar6i_ij = polar6i_i * polar6i_j
+         endif
 
          if(jrank.ge.1) then 
             dipj(:) = lab_dipole(:,jatom,jmol) 
+            if(polarizable) then 
+               dip_indj(:) = lab_ind_dipole(:,jatom,jmol)
+               dip_permj = dipj - dip_indj
+            else
+               dip_permj = dipj
+            endif
          else
             dipj = 0.0d0 
          endif
@@ -1869,9 +2023,19 @@
 !     dipole precalculations
 
             dipi_d_dipj = 0.0d0 
+            dip_indi_d_dip_indj = 0.0d0 
+
             do ivec = 1,3
                dipi_d_dipj = dipi_d_dipj + dipi(ivec) * dipj(ivec)
             end do 
+
+            if(polarizable) then 
+               if(periodic.or.imol.eq.jmol) then 
+                  do ivec = 1,3
+                     dip_indi_d_dip_indj = dip_indi_d_dip_indj + dip_indi(ivec) * dip_indj(ivec)
+                  end do 
+               endif
+            endif
          endif
          if(irank.ge.2.or.jrank.ge.2) then 
 !     quadrupole precalculations
@@ -1953,10 +2117,11 @@
                         if(.not. same_cell) loop = .true.
                      endif
                   else
-                     if(jmol.gt.imol) loop = .true.
+                     if((jmol.gt.imol).or.(imol.eq.jmol.and.jatom.gt.iatom)) loop = .true.
+                     if(imol.eq.jmol) same_mol = .true.
                   endif
-                  if(loop) then
 
+                  if(loop) then
 
 !     find minimum image in supercell
 
@@ -1987,8 +2152,7 @@
                   dif(3) = zdif
 
                   rdis = dsqrt(rdis2)                  
-!                  if(iatom.eq.1.and.jatom.eq.1) write(38,*) rdis
-                  
+
                   if(rdis.eq.0) then 
                      write(*,*) 'RDIS = 0, STOPPING',imol,jmol,iatom,jatom&
      &                    ,jcell1,jcell2,jcell3,same_cell,same_mol
@@ -2002,12 +2166,21 @@
 
                   nmax = irank + jrank + 1 
 
-                  if(periodic) call getbfuncs(ewald_eps,eps_sqrtpii,rdis,ri,gfunc,nmax)
+                  if(polarizable.and.same_mol) then
+                     aa = thole_width * polar6i_ij
+                     call gettfuncs_n(tf_power,aa,rdis,ri,dfunc,3)
+                  endif
 
                   if(periodic) then
+                     call getbfuncs(ewald_eps,eps_sqrtpii,rdis,ri,gfunc,nmax)
                      if(same_mol) then
                         call getpfuncs(ri,r2i,pfunc,nmax)
+!     for intramolecular interactions, sets gfunc to -erf/r = erfc/r - 1/r 
                         gfunc = gfunc - pfunc
+                        if(polarizable) then
+!     gfunc should contain -erfc/r, so this should subtract erfc/r from dfunc
+                           if(periodic) dfunc = dfunc + gfunc
+                        endif
                      endif
                   else
                      call getpfuncs(ri,r2i,pfunc,nmax)
@@ -2015,9 +2188,17 @@
                   endif
                   
 !     short-range electrostatic damping 
+
                   if(.not.same_mol.and.rdis.lt.rdamp_cutoff) then
-                     call getbfuncs(eps_damp,eps_damp_sqrtpii,rdis,ri,tfunc,nmax)                  
-                     gfunc = gfunc - tfunc
+                     if(damptype.eq.'DAMP') then
+                        call getbfuncs(eps_damp,eps_damp_sqrtpii,rdis,ri,tfunc,nmax)                  
+                        gfunc = gfunc - tfunc
+                     else if(damptype.eq.'THOLE') then
+                        call getpfuncs(ri,r2i,pfunc,nmax)
+                        dd = damp_width * polar6i_ij
+                        call gettfuncs_n(damp_power,dd,rdis,ri,tfunc,nmax)
+                        gfunc = gfunc - pfunc + tfunc
+                     endif
                   endif
 
                   if(periodic) then
@@ -2059,13 +2240,24 @@
                   do n = 0,irank + jrank
                      ggg(n) = 0.0d0 
                   end do 
+                  if(polarizable) then 
+                     do n = 0,irank + jrank
+                        gggd(n) = 0.0d0 
+                     end do 
+                  endif
 
-                  fieldtens0(iatom,imol) = fieldtens0(iatom,imol) + charge_j * gfunc(0) 
-                  fieldtens0(jatom,jmol) = fieldtens0(jatom,jmol) + charge_i * gfunc(0) 
 
+!     CHARGE interactions
+
+                  if(periodic.or.(.not.same_mol)) then 
+
+                     fieldtens0(iatom,imol) = fieldtens0(iatom,imol) + charge_j * gfunc(0) 
+                     fieldtens0(jatom,jmol) = fieldtens0(jatom,jmol) + charge_i * gfunc(0) 
+                     
 !     ggg are the Smith Gji(r) functions 
-
-                  ggg(0) = ggg(0) + chargei_chargej
+                     
+                     ggg(0) = ggg(0) + chargei_chargej
+                  endif
 
                   if(irank.ge.1.or.jrank.ge.1) then 
 !     DIPOLE interactions
@@ -2077,30 +2269,69 @@
                         dipj_d_r = dipj_d_r + dipj(ivec) * dif(ivec)
                      end do 
 
-                     fieldtens0(iatom,imol) = fieldtens0(iatom,imol) - dipj_d_r * gfunc(1)
-                     fieldtens0(jatom,jmol) = fieldtens0(jatom,jmol) + dipi_d_r * gfunc(1)
+                     if(polarizable) then 
+                        dip_indi_d_r = 0.0d0 
+                        dip_indj_d_r = 0.0d0 
+                        do ivec = 1,3
+                           dip_indi_d_r = dip_indi_d_r + dip_indi(ivec) * dif(ivec)
+                           dip_indj_d_r = dip_indj_d_r + dip_indj(ivec) * dif(ivec)
+                        end do 
+                     endif
 
-                     do ii = 1,3
-                        fieldtens1(ii,iatom,imol) = fieldtens1(ii,iatom,imol) & 
-     &                       + (dif(ii) * charge_j + dipj(ii)) * gfunc(1) &
-     &                       - dif(ii) * dipj_d_r * gfunc(2)  
-
-                        fieldtens1(ii,jatom,jmol) = fieldtens1(ii,jatom,jmol) & 
-     &                       + (- dif(ii) * charge_i + dipi(ii)) * gfunc(1) &
-     &                       - dif(ii) * dipi_d_r * gfunc(2)  
-                     end do 
+                     if(periodic.or.(.not.same_mol)) then 
+                        fieldtens0(iatom,imol) = fieldtens0(iatom,imol) - dipj_d_r * gfunc(1)
+                        fieldtens0(jatom,jmol) = fieldtens0(jatom,jmol) + dipi_d_r * gfunc(1)
+                     endif
 
 
-                     ggg(1) = ggg(1) + dipi_d_r * charge_j - dipj_d_r * charge_i  & 
-     &                    + dipi_d_dipj
-                     ggg(2) = ggg(2) - dipi_d_r * dipj_d_r 
-                     do ivec = 1,3
-                        force_elec(ivec) = force_elec(ivec) &
-     &                       + (dipi(ivec) * charge_j - dipj(ivec) * charge_i) * gfunc(1) & 
-     &                       - (dipi(ivec) * dipj_d_r + dipj(ivec) * dipi_d_r) * gfunc(2) 
-                     end do 
+                     if(periodic.or.(.not.same_mol)) then 
+                        do ii = 1,3
+                           fieldtens1(ii,iatom,imol) = fieldtens1(ii,iatom,imol) & 
+     &                          + (dif(ii) * charge_j + dipj(ii)) * gfunc(1) &
+     &                          - dif(ii) * dipj_d_r * gfunc(2)  
+                           
+                           fieldtens1(ii,jatom,jmol) = fieldtens1(ii,jatom,jmol) & 
+     &                          + (- dif(ii) * charge_i + dipi(ii)) * gfunc(1) &
+     &                          - dif(ii) * dipi_d_r * gfunc(2)  
+                        end do 
+
+                        ggg(1) = ggg(1) + dipi_d_r * charge_j - dipj_d_r * charge_i  & 
+     &                       + dipi_d_dipj
+                        ggg(2) = ggg(2) - dipi_d_r * dipj_d_r 
+
+                        do ivec = 1,3
+                           force_elec(ivec) = force_elec(ivec) &
+     &                          + (dipi(ivec) * charge_j - dipj(ivec) * charge_i) * gfunc(1) & 
+     &                          - (dipi(ivec) * dipj_d_r + dipj(ivec) * dipi_d_r) * gfunc(2) 
+                        end do 
+                     endif
+                     
+                     if(same_mol.and.polarizable) then 
+                        
+                        do ii = 1,3
+                           fieldtens1_intra(ii,iatom,imol) = fieldtens1_intra(ii,iatom,imol) & 
+    &                          + (dip_indj(ii)) * dfunc(1) &
+    &                          - dif(ii) * dip_indj_d_r * dfunc(2)
+                           
+                          fieldtens1_intra(ii,jatom,jmol) = fieldtens1_intra(ii,jatom,jmol) & 
+    &                          + (dip_indi(ii)) * dfunc(1) &
+    &                          - dif(ii) * dip_indi_d_r * dfunc(2)
+      
+                        end do 
+
+
+                        gggd(1) = gggd(1) + dip_indi_d_dip_indj
+                        gggd(2) = gggd(2) - dip_indi_d_r * dip_indj_d_r 
+                        
+                        do ivec = 1,3
+                           force_elec(ivec) = force_elec(ivec) &
+     &                          - (dip_indi(ivec) * dip_indj_d_r + dip_indj(ivec) * dip_indi_d_r) * dfunc(2) 
+                        end do 
+                        
+                     endif
                   endif
 
+                  if(periodic.or.(.not.same_mol)) then 
 
                   if(irank.ge.2.or.jrank.ge.2) then 
 !     QUADRUPOLE INTERACTIONS
@@ -2113,7 +2344,6 @@
                   zz = zdif * zdif
                   
                   call convert_quad_to_spherical(xx,xy,xz,yy,yz,zz,rsolid2)
-
 
                   quadi_d_r = 0.0d0 
                   quadj_d_r = 0.0d0 
@@ -2416,17 +2646,28 @@
      &                    - 3.0d0*(octi_dd_rr(ivec) * octj_ddd_rrr + octj_dd_rr(ivec) * octi_ddd_rrr)*gfunc(6) 
                   end do 
                endif
+            endif
+
                
                do n = 0,irank + jrank
                   do ivec = 1,3
                      force_elec(ivec) = force_elec(ivec) - ggg(n) * gfunc(n+1) * dif(ivec) 
                   end do 
                end do 
+
+               if(polarizable) then 
+                  do n = 0,2
+                     do ivec = 1,3
+                        force_elec(ivec) = force_elec(ivec) - gggd(n) * dfunc(n+1) * dif(ivec) 
+                     end do 
+                  end do 
+               endif
+
                
                xforce = force_elec(1) * fac(2)
                yforce = force_elec(2) * fac(2)
                zforce = force_elec(3) * fac(2)
-               
+
                if(.not.same_atom) then 
                   
                   ffix = ffix + xforce + xforce_pair
@@ -2586,6 +2827,7 @@
       implicit none
       integer imol,iatom,natoms_in_mol,moltype
       real(8) :: fx,fy,fz,tx,ty,tz
+      real(8), dimension(200) :: fm_fx,fm_fy,fm_fz,fm_tx,fm_ty,fm_tz
       real(8), dimension(3,3,3) :: drotmat
       real(8), dimension(3,3) :: rotmat
       real(8), dimension(3) :: r0,r1
@@ -2597,7 +2839,7 @@
       real(8) :: dfx,dfy,dfz
       real(8) :: q_field,o_field
       real(8), dimension(3,3) :: quad0
-      real(8), dimension(3) :: qvec,fvec,ovec
+      real(8), dimension(3) :: qvec,fvec,ovec,qvec_intra,fvec_intra
 
       do imol = 1,nmol
          moltype = mol_type(imol)
@@ -2638,8 +2880,8 @@
             if(max_rank.ge.1) then 
 !     dipole contribution
                do jj = 1,3
-                  qvec(jj) = lab_dipole(jj,iatom,imol)
-                  fvec(jj) = fieldtens1(jj,iatom,imol) * fac(2)
+                  qvec(jj) = lab_perm_dipole(jj,iatom,imol)
+                  fvec(jj) = fieldtens1(jj,iatom,imol) * fac(2) - efield_ext(jj)
                end do 
 
                tx = tx - 1.0d0 * (qvec(2) * fvec(3) - qvec(3) * fvec(2))
@@ -2651,7 +2893,7 @@
                do ii = 1,3
                   do jj = 1,3
                      qvec(jj) = lab_quad(ii,jj,iatom,imol)
-                     fvec(jj) = fieldtens1_1(ii,jj,iatom,imol) * fac(2)
+                     fvec(jj) = fieldtens1_1(ii,jj,iatom,imol) * fac(2) 
                   end do 
 
                   tx = tx - 2.0d0 * (qvec(2) * fvec(3) - qvec(3) * fvec(2))
@@ -2702,6 +2944,7 @@
 
                   do ivec = 1,3
                      dudeuler(m) = dudeuler(m) - fac(2) * d1(ivec) * dfield(ivec,iatom,imol)
+                     dudeuler(m) = dudeuler(m) + d1(ivec) * efield_ext(ivec)
                   end do 
                endif
 
@@ -2785,7 +3028,7 @@
      &           ,utotal * pefac,pressure_internal*fac(7),density*fac(8)
          endif
       else
-         write(ifile,*) 
+         write(ifile,*) 'NOPBC',utotal*pefac
       endif
       write(ifile,*) 'RIGID ',rigid_output_mode
       do imol = 1,nmol
@@ -2944,7 +3187,12 @@
                   call get_rotmat(phi,theta,psi,rotmat)
                   d1 = matmul(rotmat,d0)
                   do ivec = 1,3
-                     lab_dipole(ivec,iatom,imol)  = d1(ivec)
+                     lab_dipole(ivec,iatom,imol)  = d1(ivec) 
+                     lab_perm_dipole(ivec,iatom,imol) = lab_dipole(ivec,iatom,imol)
+                     if(polarizable) then 
+                        lab_dipole(ivec,iatom,imol) = lab_perm_dipole(ivec,iatom,imol) &
+     &                    + lab_ind_dipole(ivec,iatom,imol)
+                        endif
                   end do 
                endif
                if(max_rank.ge.2) then 
@@ -3165,7 +3413,7 @@
       real(8) :: radius,ewald_error,rmin,rdamp,delta
       real(8) :: delta_frac,delta_xyz,delta_cvec,delta_angle,dmass
       real(8) :: tolerance
-      character(len=10) :: totest,toprint
+      character(len=10) :: totest,toprint,tocalc
       character(len=8) :: cvec_mode
       character(len=32) :: filename
       integer imode,nitems
@@ -3306,6 +3554,11 @@
             case('ENERGY')
                ncontrol = ncontrol + 1
                control_list(ncontrol) = "ENERGY"
+            case('CALC')
+               write(*,*) 'CALC!!!'
+               read(textlist(2),*,iostat=ios) tocalc
+               ncontrol = ncontrol +1
+               control_list(ncontrol) = tocalc
             case('TEST')
                read(textlist(2),*,iostat=ios) totest
                ncontrol = ncontrol + 1
@@ -3614,8 +3867,6 @@
          write(*,*) 'ERROR: INVALID READ MODE'
          stop
       endif
-
-
       end subroutine read_input_header
 
       subroutine get_cvec(buffer)
@@ -3663,7 +3914,6 @@
       
       end subroutine get_cvec
 
-
       subroutine read_model
       use common_data
       use nr_mod
@@ -3677,8 +3927,9 @@
       integer, dimension(16) :: power_list,power_list_default
       real(8), dimension(100,100) :: spline_data
       real(8), dimension(16) :: coeff_list
-      integer n,nb,i,imax
+      integer n,nb,i,imax,nnn
       real(8) :: r0,u0,dudr0,dudrmax,uu,dudr
+      real(8) :: polar
       logical:: error,match,has_mass,has_index
       real(8) :: r,rmin,rdamp,dmass
       real(8) :: rspline_max,rspline_min
@@ -3697,6 +3948,7 @@
 
 !     defaults
       ns = 100
+      polar = 0.5d0
       call set_nspline(ns)
 
       do while(.true.)
@@ -3753,6 +4005,9 @@
                        nitem = nitem + 1
                        read(textlist(nitem),*) dmass
                        has_mass = .true.
+                    case('POLAR')
+                       nitem = nitem + 1
+                       read(textlist(nitem),*) polar
                     case default
                       write(*,*) 'ERROR IN MODEL FILE: &
      &UNIDENTIFIED TOKEN ', token
@@ -3772,11 +4027,13 @@
 
                pair_index(iatom,moltype) = index
                mass(iatom,moltype) = dmass
+               polarizability(iatom,moltype) = polar
+               polar6i(iatom,moltype) = 1.0d0 / (polar**(1.0d0/6.0d0))
                if(abs(dmass).gt.1.d-10) nmass_atoms_in_mol = nmass_atoms_in_mol + 1
                if(index.gt.model_index_max) model_index_max = index
             end do 
 
-             mol_nmassatoms(moltype) = nmass_atoms_in_mol
+            mol_nmassatoms(moltype) = nmass_atoms_in_mol
          else if(textlist(1).eq.'INTER') then
             j = 0
             do m = 2,nitems
@@ -3785,22 +4042,59 @@
             end do 
             nterms_default = j
             exit
-         else if(textlist(1).eq.'DAMP') then
-            read(textlist(2),*) rdamp
-            call set_damp(rdamp)
-            write(*,*)
-            write(*,21) rdamp
- 21         format('SETTING DAMP TO ',f14.6,' Angstroms')
-         else if(textlist(1).eq.'NSPLINE') then 
-            read(textlist(2),*) ns
-            call set_nspline(ns)
-            write(*,*) 
-            write(*,22) nspline
- 22         format('SETTING NSPLINE TO ',i6)
-         else
-            exit
-            stop
-         endif
+
+         else if(textlist(1).eq.'THOLE_INTER_DAMP') then
+            damptype = 'THOLE'
+            nitem = 1
+            do while(.true.)
+               nitem = nitem + 1
+               read(textlist(nitem),*) token
+               if(nitem.gt.nitems) exit
+               
+               select case(token)
+            case('POWER')
+               nitem = nitem + 1
+               read(textlist(nitem),*) damp_power
+            case('WIDTH')
+               nitem = nitem + 1
+               read(textlist(nitem),*) damp_width
+            end select
+         end do 
+      else if(textlist(1).eq.'DAMP') then 
+         damptype = 'DAMP'
+         read(textlist(2),*) rdamp
+         call set_damp(rdamp)
+         write(*,21) rdamp
+ 21      format('SETTING DAMP TO ',f14.6,' Angstroms')
+      else if(textlist(1).eq.'THOLE_INTRA_DAMP') then 
+         damptype = 'THOLE'
+         polarizable = .true.
+         nitem = 1
+         do while(.true.)
+            nitem = nitem + 1
+            read(textlist(nitem),*) token
+            if(nitem.gt.nitems) exit
+            
+            select case(token)
+         case('POWER')
+            nitem = nitem + 1
+            read(textlist(nitem),*) tf_power
+         case('WIDTH')
+            nitem = nitem + 1
+            read(textlist(nitem),*) thole_width
+         end select
+      end do 
+      
+      else if(textlist(1).eq.'NSPLINE') then 
+         read(textlist(2),*) ns
+         call set_nspline(ns)
+         write(*,*) 
+         write(*,22) nspline
+ 22      format('SETTING NSPLINE TO ',i6)
+      else
+         exit
+         stop
+      endif
       end do 
 
       nb = 0
@@ -4593,6 +4887,7 @@
             if(max_rank.ge.1) then 
                do ivec = 1,3
                   lab_dipole(ivec,iatom,imol) = site_dipole0(ivec,iatom,conformer,moltype)
+                  lab_perm_dipole(ivec,iatom,imol) = lab_dipole(ivec,iatom,imol)
                   if(max_rank.ge.2) then 
                      do jvec = 1,3
                         lab_quad(ivec,jvec,iatom,imol) = site_quad0(ivec,jvec,iatom,conformer,moltype)
@@ -4669,7 +4964,6 @@
       x31 = x3 - x1
       y31 = y3 - y1
       z31 = z3 - z1
-
 
 !     x axis
 
@@ -4797,6 +5091,9 @@
             ucharge = ucharge + 0.5d0 * lab_charge(iatom,imol) * cfield(iatom,imol) * fac(2) 
             do ivec = 1,3
                udipole = udipole + 0.5d0 * lab_dipole(ivec,iatom,imol) * dfield(ivec,iatom,imol) * fac(2)
+               if(polarizable) then 
+                  udipole = udipole + 0.5d0 * lab_ind_dipole(ivec,iatom,imol) * dfield_intra(ivec,iatom,imol) * fac(2)
+               endif
                do jvec = 1,3
                   uquad = uquad + 0.5d0 * lab_quad(ivec,jvec,iatom,imol) * qfield(ivec,jvec,iatom,imol) * fac(2)
                   do kvec = 1,3
@@ -4809,6 +5106,65 @@
 
       end subroutine CALC_ELEC
       
+      subroutine calc_uext()
+      use common_data
+      use nr_mod
+      implicit none
+      integer imol,moltype,natoms_in_mol,ivec,jvec,iatom,conformer,m
+      real(8), dimension(3) :: r0,d0,d1
+      real(8), dimension(3) :: vec0,vec1
+      real(8) :: f1dif, f2dif, f3dif
+      real(8) :: xforce,yforce,zforce
+      real(8), dimension(3,3) :: drot
+      real(8), dimension(3,3,3) :: drotmat
+      real(8), dimension(3,3) :: rotmat
+      real(8) :: phi,theta,psi
+      logical okflag
+
+      call mat3inverse(cvec,cveci,okflag)
+
+      do imol = 1,nmol
+         moltype = mol_type(imol)
+         natoms_in_mol = mol_natoms(moltype)
+         conformer = mol_conformer(imol)
+
+         do iatom = 1,natoms_in_mol
+
+            r0(:)  = lab_coord(:,iatom,imol) 
+            uext = uext - lab_charge(iatom,imol) * (efield_ext(1) * r0(1) + efield_ext(2) * r0(2) + efield_ext(3) * r0(3))
+            uext = uext - lab_dipole(1,iatom,imol) * efield_ext(1) &
+     & - lab_dipole(2,iatom,imol) * efield_ext(2) - lab_dipole(3,iatom,imol) * efield_ext(3)
+
+!     F = qE
+
+            do ivec = 1,3
+               force(ivec,iatom,imol) = force(ivec,iatom,imol) + lab_charge(iatom,imol) * efield_ext(ivec) 
+            end do 
+         end do 
+       end do 
+
+      end subroutine calc_uext
+
+      subroutine calc_spring()
+      use common_data
+      implicit none
+      integer natoms_in_mol,imol,moltype,iatom,ivec
+
+      uspring = 0.0d0 
+      do imol = 1,nmol
+         moltype = mol_type(imol)
+         natoms_in_mol = mol_natoms(moltype)
+
+         do iatom = 1,natoms_in_mol
+            do ivec = 1,3
+               uspring = uspring + (lab_ind_dipole(ivec,iatom,imol)**2) & 
+     & / (2.0d0 * polarizability(iatom,moltype)/fac(2))
+            end do 
+         end do 
+      end do 
+
+      end subroutine calc_spring
+
 
       subroutine PRESS()
       use common_data
@@ -4891,6 +5247,219 @@
       end do 
 
       end subroutine getpfuncs
+
+      subroutine gettfuncs_n(nnn,aa,rr,rri,tfunc,nmax) 
+      use common_data
+      use nr_mod
+      implicit none
+      real(8), dimension(0:10) :: tfunc,rfunc,pfunc
+      real(8) :: rr,rr2,rri,rr2i,rrn_a
+      real(8) :: gg3,gg2,efac,dens
+      real(8) :: aa,aarr,aarr2,aarr3,aarrn
+      real(8) :: gamman2i,gamman3i,gamman3i_i,n2i,n3i
+      real(8) :: dnnn,r2ni
+      real(8) :: tt1,tt2,tt3,tt4
+      integer n,k,nnn,nmax
+
+!     in the case of n = 2,3 cheaper to call bespoke functions
+      if(nnn.eq.2) then 
+         call gettfuncs2(aa,rr,rri,tfunc,nmax)
+         return
+      else if(nnn.eq.3) then
+         call gettfuncs3(aa,rr,rri,tfunc,nmax)
+         return
+      endif
+
+      n3i = 3.0d0 / dble(nnn)
+      n2i = 2.0d0 / dble(nnn)
+
+      gamman3i = gamma(n3i)
+      gamman2i = gamma(n2i)
+
+      gamman3i_i = 1.0d0 / gamman3i
+
+      dnnn = dble(nnn)
+
+      rr2 = rr*rr
+      rr2i = rri * rri
+
+      aarr = aa * rr
+      aarr2 = aarr**2
+      aarr3 = aarr2*aarr
+      
+      aarrn = (aa * rr)**nnn
+
+      gg3 = gamman3i * gammq(n3i,aarrn)/(dnnn * aarr3)
+      gg2 = gamman2i * gammq(n2i,aarrn)/(dnnn * aarr2)
+      efac = dexp(-aarrn)
+
+      r2ni = rr2
+      tfunc(0) = gg2 * r2ni
+
+      if(nmax.ge.1) then 
+         r2ni = r2ni * rr2i
+         tfunc(1) = 0.0d0  
+         
+         if(nmax.ge.2) then 
+            r2ni = r2ni * rr2i
+            tfunc(2) = -efac * r2ni 
+            
+            if(nmax.ge.3) then 
+               r2ni = r2ni * rr2i
+               tfunc(3) = -efac * (5.0d0 + & 
+     &              aarrn * dnnn) *r2ni
+               
+               if(nmax.ge.4) then 
+                  r2ni = r2ni * rr2i
+                  tt1 = - 1.0d0 + aarrn
+                  tfunc(4) = -efac * (35.0d0 &
+     &                 + aarrn * dnnn * (9.0d0 &
+     &                 + dnnn * tt1)) * r2ni
+                  
+                  if(nmax.ge.5) then 
+                     r2ni = r2ni * rr2i
+                     tt2 = 1.0d0 + aarrn * (-3.0d0 + aarrn)
+                     tfunc(5) = -efac * (315.0d0 &
+     &                    + aarrn * dnnn * (89.0d0 &
+     &                    + dnnn * (15.0d0 * tt1 &
+     &                    + dnnn * tt2))) * r2ni
+                     
+                     if(nmax.ge.6) then 
+                        r2ni = r2ni * rr2i
+                        tt3 = -1.0d0 + aarrn * (7.0d0 + aarrn * (- 6.0d0 + aarrn))
+                        tfunc(6) = -efac * (3465.0d0 & 
+     &                       + aarrn * dnnn * (1027.0d0  & 
+     &                       + dnnn * (209.d0 * tt1  & 
+     &                       + dnnn * (23.0d0 * tt2 &
+     &                       + dnnn * tt3)))) * r2ni
+
+                        if(nmax.ge.7) then 
+                           r2ni = r2ni * rr2i
+                           tt4 = 1.0d0 + aarrn * (- 15.0d0 + aarrn * (25.0d0 + aarrn * (- 10.0d0 + aarrn)))
+                           tfunc(7) = -efac * (45045.0d0 & 
+     &                          + aarrn * dnnn * (13735.0d0 & 
+     &                          + dnnn * (3117.0d0 * tt1 & 
+     &                          + dnnn * (439.0d0 * tt2 & 
+     &                          + dnnn * (33.0d0 * tt3 & 
+     &                          + dnnn * tt4))))) * r2ni
+                        endif
+                     endif
+                  endif
+               endif
+            endif
+         endif
+      endif
+
+      rfunc(0) = -rr2 *  gg3 
+      pfunc(0) = rri 
+      do k = 1,nmax
+         rfunc(k) = (2*(k-1)+1) * rfunc(k-1) * rr2i 
+         pfunc(k) = (2*(k-1)+1) * pfunc(k-1) * rr2i 
+      end do 
+      
+      tfunc = pfunc + (tfunc + rfunc) * dnnn *  (aa**3) * gamman3i_i
+      end subroutine gettfuncs_n
+
+
+      subroutine GETTFUNCS2(aa,rr,rri,bfunc,nmax)
+!---------------------------------------------------
+!     calculate the B functions from W. Smith's
+!     Ewald Sum revisited paper
+!---------------------------------------------------
+      use common_data
+      implicit none
+      real(8),intent(in) :: rr,rri
+      real(8) :: aa,efac,rr2i,pfac
+      real(8) :: pow,rr_aa,aa_sqrtpii
+      real(8), dimension(0:10),intent(out) :: bfunc
+      integer :: i,nmax
+
+      rr2i = rri * rri
+      rr_aa = rr * aa
+
+      aa_sqrtpii = 1.0d0/(aa*sqrtpi)
+
+      bfunc(0) = derf(rr_aa) * rri
+      efac = dexp(-rr_aa**2) * aa_sqrtpii
+
+      pow = 1.d0
+      pfac = 2.d0 * aa*aa
+      do i = 1,nmax
+         pow = pow * pfac
+         bfunc(i) = rr2i*(dble(2*i-1)*bfunc(i-1)-pow * efac)
+      end do
+
+      end subroutine gettfuncs2
+
+
+      subroutine gettfuncs3(aa,rr,rri,tfunc,nmax)
+      use nr_mod
+      implicit none
+      real(8),intent(in) :: rr,rri
+      real(8),dimension(0:10) :: tfunc,pfunc
+      real(8) :: rr2i
+      real(8) :: aarr3
+      real(8) :: efac
+      real(8) :: aa,athird,rni
+      real(8),parameter :: g23 = 1.3541179394264005d0,twothirds = 0.66666666666666666667d0
+      integer k,nmax
+
+      aarr3 = (aa*rr)**3
+      athird = aa**(1.0d0/3.0d0)
+
+      efac = dexp(-aarr3)
+
+      rr2i = rri*rri
+
+      pfunc(0) = rri
+      do k = 1,nmax
+         pfunc(k) = (2*(k-1)+1) * pfunc(k-1) * rr2i
+      end do
+
+      rni = rri
+      tfunc(0) = - efac*rni + gammq(twothirds,aarr3) * g23 *aa
+
+      if(nmax.ge.1) then 
+         rni = rni * rr2i
+         tfunc(1) = - efac * rni
+         
+         if(nmax.ge.2) then 
+            rni = rni * rr2i
+            tfunc(2) = - 3.0d0 * efac * (1.0d0 + aarr3 ) * rni
+            
+            if(nmax.ge.3) then
+               rni = rni * rr2i
+               tfunc(3) = - 3.0d0 * efac * (5.0d0 + aarr3 * (5.0d0  + aarr3 * 3.0d0 )) * rni
+               
+               if(nmax.ge.4) then
+                  rni = rni * rr2i
+                  tfunc(4) = - 3.0d0 * efac * (35.0d0 +  aarr3 * (35.0d0 +  aarr3 * (18.0d0 +  aarr3 * 9.0d0)))*rni
+                  
+                  if(nmax.ge.5) then 
+                     rni = rni * rr2i
+                     tfunc(5) = - 9.0d0 * efac * (105.0d0 + aarr3 * (105.0d0 &
+     &                    + aarr3 * (53.0d0  + aarr3 * (18.0d0  + aarr3 * 9.0d0))))*rni
+                     
+                     if(nmax.ge.6) then 
+                        rni = rni * rr2i
+                        tfunc(6) = - 9.0d0 * efac * (1155.0d0 + aarr3 * (1155.0d0 + aarr3 * (580.0d0 &
+     &                       + aarr3 * (195.0d0 + aarr3 * (45.0d0 + aarr3 * 27.0d0)))))*rni
+                        
+                        if(nmax.ge.7) then 
+                           rni = rni * rr2i
+                           tfunc(7) = -9.0d0 * efac * (15015.0d0 + aarr3 * (15015.0d0 + aarr3 * (7525.0d0  &
+     &                          + aarr3 * (2520.0d0 + aarr3 * (630.0d0  + aarr3 * (81.0d0 + aarr3 * 81.0d0 )))))) * rni
+                        endif
+                     endif
+                  endif
+               endif
+            endif
+         endif
+      endif
+
+      tfunc = tfunc + pfunc
+
+      end subroutine gettfuncs3
 
 
       function gauss(rand,sigma)
@@ -5205,7 +5774,7 @@
       real(8) :: rdamp
       damp_width = rdamp
 !     default value, if not set by user
-      if(.not.rdamp_userset) rdamp_cutoff = 4.0d0 * damp_width
+      if(.not.rdamp_userset) rdamp_cutoff = 2.8d0 
       eps_damp = 1.0d0/(dsqrt(2.0d0) * damp_width)
       eps_damp_sqrtpii = 1.0d0/(eps_damp*dsqrt(pi))
       end subroutine set_damp
@@ -5460,8 +6029,9 @@
 
          istep = istep + 1
 
+         if(polarizable) call minimize_dipoles
          call energy()
-         write(78,*) istep,utotal * pefac
+         write(78,*) 'step',istep
          write(*,*) istep,utotal * pefac
 
          call calculate_rigid_body_forces()
@@ -6268,6 +6838,9 @@
             
             do ii = 1,3
                dfield(ii,iatom,imol) = dfield(ii,iatom,imol) + fieldtens1(ii,iatom,imol)
+               if(polarizable) then 
+                  dfield_intra(ii,iatom,imol) = dfield_intra(ii,iatom,imol) + fieldtens1_intra(ii,iatom,imol)
+               endif
             end do 
 
             do ii = 1,5
@@ -6593,7 +7166,7 @@
          tot_charge = tot_charge + charge
       endif
       
-      if(rank.ge.1) then 
+      if(rank.ge.1.or.polarizable) then 
          if(max_rank.lt.1) max_rank = 1
          if(site_rank(iatom,moltype).lt.1) site_rank(iatom,moltype) = 1
 
@@ -6713,3 +7286,95 @@
 !     print results during a relaxation.
       end subroutine print_data
 
+      subroutine calc_polarizability
+      use common_data
+      implicit none      
+      real(8), dimension(3) :: diptotal0,diptotal
+      real(8), dimension(3,3) :: alpha
+      real(8) :: tiny,mintol_orig
+      integer ivec,jvec
+      integer iatom
+
+      if(.not.polarizable) then
+         write(*,*) 'WARNING: POLARIZABILITY SWITCHED OFF. &
+     &ABORTING CALC POLARIZABILITY.'
+         return
+      endif
+
+      tiny = 1.0d-4
+      
+      mintol_orig = mintol
+      mintol = 0.0d0 
+
+      efield_ext = 0.0d0 
+
+      call minimize_dipoles()
+      call calc_diptotal(diptotal0)
+      
+      do ivec = 1,3
+         efield_ext = 0.0d0 
+         efield_ext(ivec) = tiny
+         lab_ind_dipole = 0.0d0 
+         call minimize_dipoles()
+         call calc_diptotal(diptotal)
+         do jvec = 1,3
+            alpha(ivec,jvec) = (diptotal(jvec) - diptotal0(jvec)) / tiny
+         end do 
+      end do 
+
+      alpha = alpha * fac(2) 
+
+      write(*,*) 
+      write(*,*) 'POLARIZABILITY TENSOR IN ANGSTROMS^3'
+      write(*,*)
+      write(*,*) alpha(1,1),alpha(1,2),alpha(1,3)
+      write(*,*) alpha(2,1),alpha(2,2),alpha(2,3)
+      write(*,*) alpha(3,1),alpha(3,2),alpha(3,3)
+
+      mintol = mintol_orig
+
+      end subroutine calc_polarizability
+
+      subroutine calc_diptotal(diptotal)
+      use common_data
+      implicit none  
+      integer imol,moltype,natoms_in_mol,iatom,ivec
+      real(8), dimension(3) :: diptotal 
+      real(8), dimension(3) :: r0
+
+      diptotal = 0.0d0 
+
+      do imol = 1,nmol
+         moltype = mol_type(imol)
+         natoms_in_mol = mol_natoms(moltype)
+         do iatom = 1,natoms_in_mol
+            r0(:)  = lab_coord(:,iatom,imol) 
+            do ivec = 1,3
+               diptotal(ivec) = diptotal(ivec) + lab_charge(iatom,imol) * r0(ivec)
+            end do 
+            if(max_rank.ge.1) then 
+               do ivec = 1,3
+                  diptotal(ivec) = diptotal(ivec) + lab_dipole(ivec,iatom,imol)
+               end do 
+            endif
+         end do 
+      end do 
+
+      end subroutine calc_diptotal
+
+      subroutine get_lab_dipole
+      use common_data
+      implicit none
+      integer :: imol,moltype,iatom,natoms_in_mol,ivec
+
+      do imol = 1,nmol
+         moltype = mol_type(imol)
+         natoms_in_mol = mol_natoms(moltype)
+         do iatom = 1,natoms_in_mol
+            do ivec = 1,3
+               lab_dipole(ivec,iatom,imol) = lab_perm_dipole(ivec,iatom,imol) + lab_ind_dipole(ivec,iatom,imol)
+            end do 
+         end do 
+      end do 
+
+      end subroutine get_lab_dipole

@@ -1,17 +1,18 @@
       module common_data
       real(8), dimension(:,:,:,:), allocatable :: site_coord0
       real(8), dimension(:,:), allocatable :: lab_charge
-      real(8), dimension(:,:,:), allocatable :: lab_dipole
+      real(8), dimension(:,:,:), allocatable :: lab_dipole,lab_ind_dipole,lab_perm_dipole
       real(8), dimension(:,:,:,:), allocatable :: lab_quad
       real(8), dimension(:,:,:,:,:), allocatable :: lab_oct
       real(8), dimension(:,:,:), allocatable :: lab_coord,lab_relative_coord
+      real(8), dimension(:,:), allocatable :: polarizability,polar6i
       character(len = 3), dimension(:,:), allocatable :: site_name
       integer, dimension(:), allocatable :: mol_natoms
       integer, dimension(:), allocatable :: mol_nmassatoms
       integer, dimension(:), allocatable :: mol_type
       real(8), dimension(:,:), allocatable :: mol_euler,mol_com
       integer nmol,natoms,nmassatoms
-      real(8) :: utotal,upair,ucharge,udipole,uquad,uoct,uconformer
+      real(8) :: utotal,upair,ucharge,udipole,uquad,uoct,uconformer,uspring,uext
       real(8), dimension(:,:,:), allocatable :: force
       real(8), dimension(:,:), allocatable :: mass
       real(8), dimension(:,:), allocatable :: forcemol,fracforcemol,torquemol
@@ -24,26 +25,28 @@
       real(8), dimension(:,:,:,:,:,:), allocatable :: site_oct0
 
       real(8), dimension(:,:), allocatable :: cfield
-      real(8), dimension(:,:,:), allocatable :: dfield
+      real(8), dimension(:,:,:), allocatable :: dfield,dfield_intra
       real(8), dimension(:,:,:,:), allocatable :: qfield
       real(8), dimension(:,:,:,:,:), allocatable :: ofield
 
       real(8), dimension(:,:,:), allocatable :: lab_spherical2,lab_spherical3
       real(8), dimension(:,:,:,:), allocatable :: lab_spherical2_1
 
-      real(8), dimension(:,:,:), allocatable :: fieldtens1,fieldtens2,fieldtens3
+      real(8), dimension(:,:,:), allocatable :: fieldtens1,fieldtens2,fieldtens3,fieldtens1_intra
       real(8), dimension(:,:), allocatable :: fieldtens0
       real(8), dimension(:,:,:,:), allocatable :: fieldtens1_1,fieldtens2_1
 
+      real(8), dimension(3) :: efield_ext
+
       integer nmoltypes
       real(8), dimension(10) :: unit,fac
-      real(8) :: lightspeed,hbar,boltz,pi
+      real(8) :: lightspeed,hbar,boltz,pi,sqrtpi
       real(8) :: eps0,avsno
       real(8), dimension(3,3) :: cvec,cveci
       real(8) :: ewald_eps,kcut,rcut,rcut2
       real(8) :: eps_sqrtpii
       real(8), dimension(3,3) :: dudcvec,dudcvec_coulomb,dudcvec_pair,dudcvec_intra,dudcvec_pv
-      logical :: rigid,periodic,rdamp_userset
+      logical :: rigid,periodic,rdamp_userset,min_dipoles_only
       real(8), dimension(:,:), allocatable :: rfrac
       real(8) :: cmax
       integer, dimension(:), allocatable :: dimensionality
@@ -57,8 +60,6 @@
       real(8) :: r_closest
       character(len=16) :: read_mode,read_cvec,write_cvec,rigid_output_mode,rigid_input_mode
       integer, dimension(:,:), allocatable :: pair_index
-      real(8), dimension(:,:,:,:), allocatable :: fm_force
-      real(8), dimension(:,:,:), allocatable :: fm_forcemol,fm_torquemol
       integer, dimension(:,:), allocatable :: model_list
       real(8), dimension(:,:), allocatable :: model_coeff
       integer, dimension(:,:), allocatable :: model_power
@@ -73,7 +74,8 @@
       integer :: nhbins
       integer :: nspline
       logical :: use_spline
-      real(8) :: damp_width,rdamp_cutoff,eps_damp,eps_damp_sqrtpii
+      logical :: polarizable
+      real(8) :: damp_width,thole_width,rdamp_cutoff,eps_damp,eps_damp_sqrtpii
       character(len = 8), dimension(:), allocatable :: bond_name
       integer(8) nbondlist,npair,nmodel_param
       character(len = 32) :: batch_file
@@ -85,9 +87,10 @@
       integer model_index_max
       real(8), dimension(:,:,:,:), allocatable :: trans_mat
       integer, dimension(:,:), allocatable :: site_rank
-
+      integer damp_power,tf_power
       integer nmoltype_max,nconformer_max,natom_max,nmol_max
       integer nspline_max,nbondlist_max,nmodel_param_max,nterms_max,nbin_max
+      character(len = 8) :: damptype
 
       end module common_data
 

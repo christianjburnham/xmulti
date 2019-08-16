@@ -62,10 +62,14 @@
       allocate(site_coord0(3,natom_max,nconformer_max,nmoltype_max))
       allocate(lab_charge(natom_max,nmol_max))
       allocate(lab_dipole(3,natom_max,nmol_max))
+      allocate(lab_ind_dipole(3,natom_max,nmol_max))
+      allocate(lab_perm_dipole(3,natom_max,nmol_max))
       allocate(lab_quad(3,3,natom_max,nmol_max))
       allocate(lab_oct(3,3,3,natom_max,nmol_max))
       allocate(lab_coord(3,natom_max,nmol_max))
       allocate(lab_relative_coord(3,natom_max,nmol_max))
+      allocate(polarizability(natom_max,nmoltype_max))
+      allocate(polar6i(natom_max,nmoltype_max))
       allocate(site_name(nmoltype_max,natom_max))
       allocate(mol_natoms(nmoltype_max))
       allocate(mol_nmassatoms(nmoltype_max))
@@ -87,6 +91,7 @@
 
       allocate(cfield(natom_max,nmol_max))
       allocate(dfield(3,natom_max,nmol_max))
+      allocate(dfield_intra(3,natom_max,nmol_max))
       allocate(qfield(3,3,natom_max,nmol_max))
       allocate(ofield(3,3,3,natom_max,nmol_max))
 
@@ -96,6 +101,7 @@
       
       allocate(fieldtens0(natom_max,nmol_max))
       allocate(fieldtens1(3,natom_max,nmol_max))
+      allocate(fieldtens1_intra(3,natom_max,nmol_max))
       allocate(fieldtens2(5,natom_max,nmol_max))
       allocate(fieldtens3(7,natom_max,nmol_max))
       allocate(fieldtens1_1(3,3,natom_max,nmol_max))
@@ -111,10 +117,6 @@
       allocate(nmoloftype(nmoltype_max))
 
       allocate(pair_index(natom_max,nmoltype_max))
-
-      allocate(fm_force(nmodel_param_max,3,natom_max,nmol_max))
-      allocate(fm_forcemol(nmodel_param_max,3,nmol_max))
-      allocate(fm_torquemol(nmodel_param_max,3,nmol_max))
 
       allocate(model_list(nbondlist_max,3))
       allocate(model_coeff(nterms_max,nbondlist_max))
