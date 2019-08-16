@@ -1737,7 +1737,7 @@
       real(8) :: xforce_pair,yforce_pair,zforce_pair
       real(8) :: xforce,yforce,zforce
       real(8), dimension(3) :: force_elec
-      real(8), dimension(0:10) :: pfunc,bfunc,efunc,gfunc,tfunc,dfunc
+      real(8), dimension(0:10) :: pfunc,bfunc,efunc,gfunc,tfunc,dfunc,erf_func,erfc_func
       real(8) :: rdis2,aa,dd
       real(8) :: xxdif,yydif,zzdif
       real(8) :: upair0,switch,rc0,rc1,dupair0,dswitchdss,dswitchdr,ss,dssdr
@@ -2167,23 +2167,31 @@
                   nmax = irank + jrank + 1 
 
                   if(polarizable.and.same_mol) then
+!     calculate the generalised B functions for the intramolecular dipole-dipole interactions
                      aa = thole_width * polar6i_ij
                      call gettfuncs_n(tf_power,aa,rdis,ri,dfunc,3)
                   endif
 
+                  call getpfuncs(ri,r2i,pfunc,nmax)
+
                   if(periodic) then
-                     call getbfuncs(ewald_eps,eps_sqrtpii,rdis,ri,gfunc,nmax)
+!     reciprocal space calculates erf/r, so calculate erfc/r = 1/r - erf/r for intermolecular real space
+!     sums to give 1/r interaction
+                     call getbfuncs(ewald_eps,eps_sqrtpii,rdis,ri,erfc_func,nmax)
+                     gfunc = erfc_func
+
                      if(same_mol) then
-                        call getpfuncs(ri,r2i,pfunc,nmax)
-!     for intramolecular interactions, sets gfunc to -erf/r = erfc/r - 1/r 
-                        gfunc = gfunc - pfunc
+!     reciprocal space calculates erf/r, so calculate -erf/r for intramolecular real space.
+!     sums to give 0 interaction
+                        erf_func = pfunc - erfc_func
+                        gfunc = -erf_func
                         if(polarizable) then
-!     gfunc should contain -erfc/r, so this should subtract erfc/r from dfunc
-                           if(periodic) dfunc = dfunc + gfunc
+!     reciprocal space calculates erf/r, so subtract erf/r from intramolecular dfunc
+                           if(periodic) dfunc = dfunc - erf_func
                         endif
                      endif
                   else
-                     call getpfuncs(ri,r2i,pfunc,nmax)
+!     no periodic boundary conditions. Just calculate 1/r
                      gfunc = pfunc
                   endif
                   
@@ -2194,7 +2202,6 @@
                         call getbfuncs(eps_damp,eps_damp_sqrtpii,rdis,ri,tfunc,nmax)                  
                         gfunc = gfunc - tfunc
                      else if(damptype.eq.'THOLE') then
-                        call getpfuncs(ri,r2i,pfunc,nmax)
                         dd = damp_width * polar6i_ij
                         call gettfuncs_n(damp_power,dd,rdis,ri,tfunc,nmax)
                         gfunc = gfunc - pfunc + tfunc
@@ -5261,6 +5268,12 @@
       real(8) :: tt1,tt2,tt3,tt4
       integer n,k,nnn,nmax
 
+!     calculates the Smith B functions for the charge density 
+!     rho = A exp(-[aa *rr]**nnn)
+!     This can be checked from calculating
+!     dens = -(tfunc(2) * rr*rr - 3.0d0 * tfunc(1))
+
+
 !     in the case of n = 2,3 cheaper to call bespoke functions
       if(nnn.eq.2) then 
          call gettfuncs2(aa,rr,rri,tfunc,nmax)
@@ -5357,6 +5370,7 @@
          pfunc(k) = (2*(k-1)+1) * pfunc(k-1) * rr2i 
       end do 
       
+!     normalise, and add on 1/r term 
       tfunc = pfunc + (tfunc + rfunc) * dnnn *  (aa**3) * gamman3i_i
       end subroutine gettfuncs_n
 
