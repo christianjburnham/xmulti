@@ -361,7 +361,7 @@
       implicit none
       integer i,j
       real(8) :: xvec(60000)
-      real(8) :: ftol,fret
+      real(8) :: ftol,fret,uu,func
       integer :: imol,n,ieuler,ivec,jvec,iter,moltype,imode
       integer :: natoms_in_mol,iatom
       character(len = 10) :: mintype
@@ -412,19 +412,8 @@
       nprintdata = 2000
 
       call frprmn(xvec,n,ftol,iter,fret)
-
-      if(min_dipoles_only) then 
-         call get_lab_dipole()
-      else
-
-      if(periodic) then 
-           call generate_cartesians_from_frac()
-        else
-           call generate_cartesians()
-        endif
-      endif
-
-      call energy()
+!     pack in the final values of xvec and calculate the energy
+      uu = func(xvec)
 
       end subroutine minimize
 
