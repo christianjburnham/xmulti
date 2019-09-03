@@ -3834,6 +3834,14 @@
 
       read(10,*,iostat = ios) nmol
       if(ios.ne.0) return
+
+      if(nmol.gt.nmol_max) then 
+         write(*,*) 'ERROR: number of molecules in INPUT file = ',nmol
+         write(*,*) 'smaller than NMOL_MAX in SIZE file = ',nmol_max
+         write(*,*) 'Suggest increasing NMOL_MAX in SIZE file'
+         stop
+      endif
+
       read(10,73) cvec_buffer
       
  73   format(a256)
